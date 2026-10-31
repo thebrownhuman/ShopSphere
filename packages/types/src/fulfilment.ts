@@ -2,8 +2,8 @@
  * Fulfilment, shipping and settlement API contract (M5.5–M5.7). Money is integer paise,
  * timestamps ISO 8601 UTC. Keep changes additive.
  *
- * Seller routes need `Authorization: Bearer <access token>` of a user linked to a seller
- * (seller_users). Other sellers' shipments answer 404.
+ * Seller routes need `Authorization: Bearer <access token>` of a user with an APPROVED seller
+ * account (seller_accounts, M5.1); otherwise 403 SELLER_NOT_APPROVED. Other sellers' shipments answer 404.
  *
  *   GET  /seller/orders?status=&cursor=&limit=       -> SellerOrdersPage   (queue, one row per shipment)
  *   POST /seller/orders/:shipmentId/accept            -> SellerShipment

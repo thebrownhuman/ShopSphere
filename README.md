@@ -1,8 +1,7 @@
-
 ## Milestone 5 fulfilment (seller queue, courier, settlement)
 
 Contract: `packages/types/src/fulfilment.ts` (routes in the file header). Seller routes need a user
-linked in `seller_users` (seller onboarding writes it).
+with an APPROVED `seller_accounts` row (seller onboarding, M5.1).
 
 - Seller queue (M5.5): `GET /seller/orders`, `POST /seller/orders/:shipmentId/{accept,pack,label}`,
   `GET /seller/shipments/:id` (tracking timeline), `GET /seller/shipments/:id/label.pdf`. Shipments go

@@ -101,3 +101,7 @@ export * from './order';
 // ───────── Fulfilment, shipping, settlement (M5) ─────────
 
 export * from './fulfilment';
+
+// ───────── Seller Central (M5) ─────────
+
+export * from './seller';

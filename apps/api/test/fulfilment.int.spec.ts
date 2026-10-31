@@ -125,7 +125,9 @@ describe('fulfilment, courier tracking and settlement (integration)', () => {
     });
     sellerId = seller.id;
     const sellerUser = await login('Seller Owner');
-    await prisma.sellerUser.create({ data: { userId: sellerUser.id, sellerId } });
+    await prisma.sellerAccount.create({
+      data: { userId: sellerUser.id, sellerId, displayName: 'M5 Seller', status: 'APPROVED' },
+    });
     sellerAuth = sellerUser.auth;
     const product = await prisma.product.create({
       data: {
@@ -431,7 +433,11 @@ describe('fulfilment, courier tracking and settlement (integration)', () => {
   it('seller routes need a seller account and only show own shipments', async () => {
     const { shipmentId } = await paidOrder();
     const buyer = await login('Not a seller');
-    await http().get('/seller/orders').set('authorization', buyer.auth).expect(403);
+    await http().get('/seller/orders').set('authorization', buyer.auth).expect(404);
+    await prisma.sellerAccount.create({ data: { userId: buyer.id, displayName: 'Pending' } });
+    const pending = await http().get('/seller/payouts').set('authorization', buyer.auth);
+    expect(pending.status).toBe(403);
+    expect(pending.body.code).toBe('SELLER_NOT_APPROVED');
     await http().get('/seller/orders').expect(401);
     const otherSeller = await prisma.seller.create({
       data: {
@@ -443,7 +449,14 @@ describe('fulfilment, courier tracking and settlement (integration)', () => {
       },
     });
     const other = await login('Other owner');
-    await prisma.sellerUser.create({ data: { userId: other.id, sellerId: otherSeller.id } });
+    await prisma.sellerAccount.create({
+      data: {
+        userId: other.id,
+        sellerId: otherSeller.id,
+        displayName: 'Other',
+        status: 'APPROVED',
+      },
+    });
     await http()
       .post(`/seller/orders/${shipmentId}/accept`)
       .set('authorization', other.auth)
