@@ -105,3 +105,7 @@ export * from './seller';
 // ───────── Fulfilment, shipping, settlement (M5) ─────────
 
 export * from './fulfilment';
+
+// ───────── Reviews, review summary, Q&A (M6.2–M6.4) ─────────
+
+export * from './review';

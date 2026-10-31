@@ -1,3 +1,35 @@
+## Milestone 6 reviews, review summary, Q&A
+
+Contract: `packages/types/src/review.ts` (routes and error codes in the file header). Migration
+`20261101120000_reviews_qa`.
+
+- Reviews (M6.2): only verified buyers (an order of theirs with a DELIVERED shipment containing the
+  product), one per product; 1–5 stars, headline, text, up to 5 photos (`POST /reviews/media`, stored
+  in S3 at `reviews/<id>.<ext>` in `S3_BUCKET`). Reviews with links, contact details or blocked words
+  wait as PENDING (`AUTO_FLAGGED`); three distinct reports send a published one back (`REPORTED`).
+  Helpful votes are idempotent (`PUT`/`DELETE /reviews/:id/vote`).
+- Moderation API for the admin console: `GET /admin/reviews?status&reported`, `GET /admin/reviews/:id`,
+  `POST /admin/reviews/:id/moderate {action: approve|reject, note}` (`x-internal-token` until RBAC).
+- Aggregates: every write queues the product in `review_aggregate_queue` and refreshes inline;
+  `POST /reviews/internal/refresh-aggregates` (workers, every minute) drains the queue into
+  `products.rating_x10/rating_count` and reindexes OpenSearch.
+- Summary (M6.4): `apps/workers/src/reviews` regenerates `review_summaries` every 30 min for products
+  whose review count changed, behind `ReviewSummarizer`: Claude (`claude-haiku-5-5`, structured
+  output) when `ANTHROPIC_API_KEY` is set, else a deterministic keyword-theme fallback (also used
+  when a Claude call fails).
+- Q&A (M6.3): `GET|POST /products/:id/questions` (search with `q`), customer answers at
+  `POST /questions/:id/answers`, seller answers from Seller Central (`/questions` page,
+  `GET /seller/questions`, `POST /seller/questions/:id/answers`, products the seller has offers on).
+- PDP: histogram, summary, star/photo/verified filters, sort, votes, reports, write form, Q&A.
+
+Tests: `apps/api/test/review.int.spec.ts`, `apps/workers/src/reviews/summarizer.spec.ts`, and the
+E2E `apps/web/e2e/reviews.spec.ts` (runs with `playwright.checkout-api.config.ts`; delivery is set
+in SQL through `docker exec shopsphere-postgres-1 psql`, override with `E2E_PSQL`):
+
+```bash
+corepack pnpm --filter @shopsphere/web exec playwright test -c playwright.checkout-api.config.ts e2e/reviews.spec.ts
+```
+
 ## Milestone 5 fulfilment (seller queue, courier, settlement)
 
 Contract: `packages/types/src/fulfilment.ts` (routes in the file header). Seller routes need a user

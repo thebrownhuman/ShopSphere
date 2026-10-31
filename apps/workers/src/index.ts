@@ -9,6 +9,7 @@ import { handleInvoiceEvent, invoiceOptionsFromEnv } from './invoices/invoice.jo
 import { handleNotifyEvent, notifyOptionsFromEnv } from './notifications/notify.job';
 import { eventFeedOptionsFromEnv, startEventFeed } from './orders/event-feed';
 import { reconcileOptionsFromEnv, startReconcileJob } from './payments/reconcile.job';
+import { reviewOptionsFromEnv, startReviewJobs } from './reviews/review.jobs';
 import { indexOptionsFromEnv, startIndexJob } from './search/index.job';
 
 console.log(
@@ -24,6 +25,7 @@ const stops = [
   startIndexJob(indexOptionsFromEnv(process.env)),
   startImageJob(imageOptionsFromEnv(process.env)),
   startFulfilmentJobs(fulfilmentOptionsFromEnv(process.env)),
+  startReviewJobs(reviewOptionsFromEnv(process.env)),
 ];
 
 const invoiceOpts = invoiceOptionsFromEnv(process.env);

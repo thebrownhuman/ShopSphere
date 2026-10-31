@@ -32,7 +32,7 @@ export const STACK_ENV = {
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: /checkout-api\.spec\.ts/,
+  testMatch: /(checkout-api|reviews)\.spec\.ts/,
   globalSetup: './e2e/checkout-api.setup.ts',
   timeout: 120_000,
   fullyParallel: false,

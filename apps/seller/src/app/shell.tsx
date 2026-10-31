@@ -13,6 +13,7 @@ const NAV = [
   { href: '/inventory', label: 'Inventory & prices' },
   { href: '/orders', label: 'Orders' },
   { href: '/payouts', label: 'Payouts' },
+  { href: '/questions', label: 'Customer questions' },
 ];
 
 export function Shell({ children }: { children: ReactNode }) {

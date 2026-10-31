@@ -1001,3 +1001,137 @@ model SellerMedia {
   @@index([sellerAccountId])
   @@map("seller_media")
 }
+
+// ───────── Reviews and Q&A (M6.2–M6.4) ─────────
+
+/// Product review by a verified buyer (a DELIVERED shipment containing the product). One per user
+/// per product. Auto-published unless the text trips the automated checks (then PENDING);
+/// reports past the threshold send it back to the moderation queue.
+model Review {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId      String         @map("product_id") @db.Uuid
+  userId         String         @map("user_id") @db.Uuid
+  orderId        String         @map("order_id") @db.Uuid
+  rating         Int
+  title          String
+  body           String
+  authorName     String         @map("author_name")
+  /// PUBLISHED | PENDING | REJECTED
+  status         String         @default("PUBLISHED")
+  /// Why it is in the queue (AUTO_FLAGGED | REPORTED) or the moderator's note.
+  moderationNote String?        @map("moderation_note")
+  helpfulCount   Int            @default(0) @map("helpful_count")
+  reportCount    Int            @default(0) @map("report_count")
+  imageCount     Int            @default(0) @map("image_count")
+  moderatedAt    DateTime?      @map("moderated_at") @db.Timestamptz(6)
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  images         ReviewImage[]
+  votes          ReviewVote[]
+  reports        ReviewReport[]
+
+  @@unique([userId, productId], map: "uq_reviews_user_product")
+  @@index([productId, status, createdAt], map: "idx_reviews_product_status")
+  @@index([status, createdAt], map: "idx_reviews_status")
+  @@map("reviews")
+}
+
+/// Review photo in S3 (`reviews/<id>.<ext>` in the media bucket). Uploaded before the review is
+/// written, then attached (reviewId set).
+model ReviewImage {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  reviewId    String?  @map("review_id") @db.Uuid
+  storageKey  String   @map("storage_key")
+  contentType String   @map("content_type")
+  sizeBytes   Int      @map("size_bytes")
+  position    Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  review      Review?  @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@index([reviewId])
+  @@index([userId, createdAt])
+  @@map("review_images")
+}
+
+/// Helpful vote; the composite key makes voting idempotent.
+model ReviewVote {
+  reviewId  String   @map("review_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  review    Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@id([reviewId, userId])
+  @@map("review_votes")
+}
+
+model ReviewReport {
+  reviewId  String   @map("review_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  reason    String
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  review    Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@id([reviewId, userId])
+  @@map("review_reports")
+}
+
+/// Products whose rating aggregate needs recomputing (drained by the aggregate job).
+model ReviewAggregateQueue {
+  productId String   @id @map("product_id") @db.Uuid
+  queuedAt  DateTime @default(now()) @map("queued_at") @db.Timestamptz(6)
+
+  @@map("review_aggregate_queue")
+}
+
+/// LLM (or offline) review summary, cached per product (M6.4). `ratingCount` is the published
+/// review count it was built from; the batch job regenerates when it drifts.
+model ReviewSummary {
+  productId   String   @id @map("product_id") @db.Uuid
+  summary     String
+  /// [{ label, sentiment: positive|negative|mixed, mentions }]
+  themes      Json     @default("[]")
+  /// claude | offline
+  source      String
+  model       String?
+  reviewCount Int      @map("review_count")
+  generatedAt DateTime @default(now()) @map("generated_at") @db.Timestamptz(6)
+
+  @@map("review_summaries")
+}
+
+/// Customer question on a PDP (M6.3).
+model Question {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId   String   @map("product_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  body        String
+  authorName  String   @map("author_name")
+  /// PUBLISHED | REJECTED
+  status      String   @default("PUBLISHED")
+  answerCount Int      @default(0) @map("answer_count")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  answers     Answer[]
+
+  @@index([productId, createdAt], map: "idx_questions_product")
+  @@map("questions")
+}
+
+/// Answer from a seller with an offer on the product or from a customer.
+model Answer {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  questionId    String   @map("question_id") @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  sellerId      String?  @map("seller_id") @db.Uuid
+  body          String
+  authorName    String   @map("author_name")
+  /// Customer answers only: bought the product (DELIVERED).
+  verifiedBuyer Boolean  @default(false) @map("verified_buyer")
+  status        String   @default("PUBLISHED")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  question      Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId, createdAt], map: "idx_answers_question")
+  @@map("answers")
+}
