@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "test:e2e": "playwright test",
     "test": "vitest run",
-    "test:e2e:catalog": "playwright test -c playwright.catalog.config.ts"
+    "test:e2e:catalog": "playwright test -c playwright.catalog.config.ts",
+    "test:e2e:checkout": "playwright test -c playwright.checkout.config.ts"
   },
   "dependencies": {
     "@shopsphere/types": "workspace:*",
