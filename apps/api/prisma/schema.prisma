@@ -1,0 +1,54 @@
+// Platform tables for M0. Module tables (identity, catalog, ...) are added per milestone.
+// Conventions: money = BigInt paise, timestamps = timestamptz (UTC), snake_case in SQL.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Transactional outbox: written in the same tx as the domain change, relayed by OutboxPublisher.
+model OutboxEvent {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aggregateType String    @map("aggregate_type")
+  aggregateId   String    @map("aggregate_id")
+  eventType     String    @map("event_type")
+  payload       Json
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  publishedAt   DateTime? @map("published_at") @db.Timestamptz(6)
+  attempts      Int       @default(0)
+  lastError     String?   @map("last_error")
+
+  @@index([createdAt], map: "idx_outbox_events_unpublished")
+  @@map("outbox_events")
+}
+
+/// Append-only audit trail for privileged / money-moving actions.
+model AuditLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId    String?  @map("actor_id")
+  actorType  String   @map("actor_type")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  before     Json?
+  after      Json?
+  requestId  String?  @map("request_id")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([entityType, entityId], map: "idx_audit_logs_entity")
+  @@map("audit_logs")
+}
+
+/// Idempotent consumer ledger (M0.15): one row per (consumer, event) ever handled.
+model ProcessedEvent {
+  consumer    String
+  eventId     String   @map("event_id")
+  processedAt DateTime @default(now()) @map("processed_at") @db.Timestamptz(6)
+
+  @@id([consumer, eventId])
+  @@map("processed_events")
+}

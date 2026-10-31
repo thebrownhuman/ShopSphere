@@ -1,0 +1,54 @@
+# Local dev dependencies. Kafka/Redpanda intentionally omitted: BullMQ on Redis for MVP.
+name: shopsphere
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: shopsphere
+      POSTGRES_PASSWORD: shopsphere
+      POSTGRES_DB: shopsphere
+      TZ: UTC
+      PGTZ: UTC
+    ports: ['5432:5432']
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U shopsphere']
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports: ['6379:6379']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      retries: 10
+
+  opensearch:
+    image: opensearchproject/opensearch:2.18.0
+    environment:
+      discovery.type: single-node
+      DISABLE_SECURITY_PLUGIN: 'true'
+      DISABLE_INSTALL_DEMO_CONFIG: 'true'
+      OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+    ports: ['9200:9200']
+    volumes: [osdata:/usr/share/opensearch/data]
+
+  mailpit:
+    image: axllent/mailpit:v1.21
+    ports: ['1025:1025', '8025:8025']
+
+  minio:
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: shopsphere
+      MINIO_ROOT_PASSWORD: shopsphere-dev
+    ports: ['9000:9000', '9001:9001']
+    volumes: [miniodata:/data]
+
+volumes:
+  pgdata:
+  osdata:
+  miniodata:
