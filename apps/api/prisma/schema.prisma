@@ -278,3 +278,222 @@ model Refund {
   @@index([orderId], map: "idx_refunds_order_id")
   @@map("refunds")
 }
+
+// ───────── Catalog (M2) ─────────
+
+/// Category tree. `path` is the materialized slug path ("electronics/audio/headphones").
+model Category {
+  id         String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  parentId   String?               @map("parent_id") @db.Uuid
+  slug       String                @unique
+  name       String
+  path       String                @unique
+  depth      Int                   @default(0)
+  position   Int                   @default(0)
+  /// GST rate in basis points (1800 = 18%). Null inherits from the parent.
+  gstRateBp  Int?                  @map("gst_rate_bp")
+  image      String?
+  createdAt  DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  parent     Category?             @relation("CategoryTree", fields: [parentId], references: [id])
+  children   Category[]            @relation("CategoryTree")
+  products   Product[]
+  attributes AttributeDefinition[]
+
+  @@index([parentId])
+  @@map("categories")
+}
+
+/// Per-category attribute schema: drives variant selectors and search facets.
+model AttributeDefinition {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  categoryId String   @map("category_id") @db.Uuid
+  key        String
+  label      String
+  /// TEXT | NUMBER | COLOR
+  type       String   @default("TEXT")
+  isVariant  Boolean  @default(false) @map("is_variant")
+  filterable Boolean  @default(false)
+  position   Int      @default(0)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, key])
+  @@map("attribute_definitions")
+}
+
+model Brand {
+  id       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug     String    @unique
+  name     String
+  products Product[]
+
+  @@map("brands")
+}
+
+/// Parent product; purchasable variants are `skus`.
+model Product {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug            String         @unique
+  title           String
+  brandId         String         @map("brand_id") @db.Uuid
+  categoryId      String         @map("category_id") @db.Uuid
+  description     String         @default("")
+  bullets         Json           @default("[]")
+  /// [{ group, items: [{ label, value }] }]
+  specs           Json           @default("[]")
+  /// Rating x10 (43 = 4.3), integral.
+  ratingX10       Int            @default(0) @map("rating_x10")
+  ratingCount     Int            @default(0) @map("rating_count")
+  /// Lower sells better. Feeds search ranking and best-seller rows.
+  salesRank       Int            @default(1000000) @map("sales_rank")
+  boughtLastMonth Int            @default(0) @map("bought_last_month")
+  returnDays      Int            @default(7) @map("return_days")
+  /// ACTIVE | DRAFT | BLOCKED
+  status          String         @default("ACTIVE")
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  brand           Brand          @relation(fields: [brandId], references: [id])
+  category        Category       @relation(fields: [categoryId], references: [id])
+  skus            Sku[]
+  images          ProductImage[]
+
+  @@index([categoryId])
+  @@index([brandId])
+  @@map("products")
+}
+
+model Sku {
+  id         String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId  String         @map("product_id") @db.Uuid
+  code       String         @unique
+  /// Variant attributes, e.g. {"color":"Black","storage":"128 GB"}
+  attributes Json           @default("{}")
+  barcode    String?        @unique
+  isDefault  Boolean        @default(false) @map("is_default")
+  position   Int            @default(0)
+  product    Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  offers     Offer[]
+  images     ProductImage[]
+
+  @@index([productId])
+  @@map("skus")
+}
+
+/// `storageKey` points at processed renditions in S3 (M2.3 pipeline); `sourceUrl` serves
+/// generated placeholder seed images (M2.24).
+model ProductImage {
+  id         String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId  String  @map("product_id") @db.Uuid
+  skuId      String? @map("sku_id") @db.Uuid
+  position   Int     @default(0)
+  alt        String
+  storageKey String? @map("storage_key")
+  sourceUrl  String? @map("source_url")
+  /// PENDING | READY | FAILED
+  status     String  @default("READY")
+  product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sku        Sku?    @relation(fields: [skuId], references: [id], onDelete: Cascade)
+
+  @@index([productId, position])
+  @@map("product_images")
+}
+
+/// Seller stub (M2.2). ShopSphere's own warehouses are sellers with is_first_party = true.
+model Seller {
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  slug         String  @unique
+  /// Rating x10.
+  ratingX10    Int     @default(40) @map("rating_x10")
+  isFirstParty Boolean @default(false) @map("is_first_party")
+  pincode      String
+  city         String
+  state        String
+  /// Dispatch cutoff hour in IST (0-23); later orders ship the next day.
+  cutoffHour   Int     @default(14) @map("cutoff_hour")
+  status       String  @default("ACTIVE")
+  offers       Offer[]
+
+  @@map("sellers")
+}
+
+/// SKU x seller. Check constraint stock_qty >= reserved_qty >= 0 lives in the migration SQL.
+model Offer {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  skuId       String   @map("sku_id") @db.Uuid
+  sellerId    String   @map("seller_id") @db.Uuid
+  price       BigInt
+  mrp         BigInt
+  stockQty    Int      @default(0) @map("stock_qty")
+  reservedQty Int      @default(0) @map("reserved_qty")
+  maxPerOrder Int      @default(5) @map("max_per_order")
+  /// SHOPSPHERE | SELLER
+  fulfilment  String   @default("SELLER")
+  /// ACTIVE | INACTIVE
+  status      String   @default("ACTIVE")
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  sku         Sku      @relation(fields: [skuId], references: [id], onDelete: Cascade)
+  seller      Seller   @relation(fields: [sellerId], references: [id])
+
+  @@unique([skuId, sellerId])
+  @@index([sellerId])
+  @@map("offers")
+}
+
+/// Home page CMS rows (M2.15). `dataSource` is type-specific JSON.
+model HomeSection {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// HERO_CAROUSEL | QUAD_CARDS | DEAL_ROW | PRODUCT_CAROUSEL | RECENTLY_VIEWED | CATEGORY_TILES
+  type       String
+  title      String
+  dataSource Json      @default("{}") @map("data_source")
+  position   Int
+  /// ALL | GUEST | SIGNED_IN
+  audience   String    @default("ALL")
+  active     Boolean   @default(true)
+  startsAt   DateTime? @map("starts_at") @db.Timestamptz(6)
+  endsAt     DateTime? @map("ends_at") @db.Timestamptz(6)
+
+  @@index([position])
+  @@map("home_sections")
+}
+
+/// Last viewed products per owner ("u:<userId>" or "g:<guestId>"), trimmed to 20 (M2.21).
+model RecentlyViewed {
+  ownerKey  String   @map("owner_key")
+  productId String   @map("product_id") @db.Uuid
+  viewedAt  DateTime @default(now()) @map("viewed_at") @db.Timestamptz(6)
+
+  @@id([ownerKey, productId])
+  @@index([ownerKey, viewedAt])
+  @@map("recently_viewed")
+}
+
+/// Co-view counts for "customers also viewed" (v1: pairs within one owner's recent views).
+model CoView {
+  productId String @map("product_id") @db.Uuid
+  otherId   String @map("other_id") @db.Uuid
+  count     Int    @default(0)
+
+  @@id([productId, otherId])
+  @@index([productId, count])
+  @@map("co_views")
+}
+
+/// Search analytics (M2.12): one row per query and per result click.
+model SearchEvent {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// QUERY | CLICK
+  type         String
+  searchId     String   @map("search_id")
+  query        String
+  normalized   String
+  resultsCount Int?     @map("results_count")
+  productId    String?  @map("product_id")
+  position     Int?
+  ownerKey     String?  @map("owner_key")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([normalized, createdAt])
+  @@index([searchId])
+  @@map("search_events")
+}

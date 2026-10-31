@@ -12,7 +12,8 @@
     "test": "prisma generate && jest",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "db:seed": "prisma db seed"
+    "db:seed": "prisma db seed",
+    "test:int": "prisma generate && jest --testPathPattern \"\\.int\\.spec\\.ts$\" --testPathIgnorePatterns \"/node_modules/\""
   },
   "prisma": {
     "seed": "ts-node --transpile-only prisma/seed.ts"
@@ -57,6 +58,10 @@
     "roots": [
       "<rootDir>/src",
       "<rootDir>/test"
+    ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "\\.int\\.spec\\.ts$"
     ]
   }
 }

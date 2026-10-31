@@ -84,3 +84,7 @@ export interface PincodeInfo {
   state: string;
   serviceable: boolean;
 }
+
+// ───────── Catalog, search, home (M2) ─────────
+
+export * from './catalog';
