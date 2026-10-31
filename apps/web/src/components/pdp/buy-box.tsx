@@ -3,6 +3,7 @@
 import { Button, Price, Skeleton, formatPrice } from '@shopsphere/ui';
 import { useEffect, useId, useState } from 'react';
 import { countdown, formatDeliveryDate } from '@/lib/delivery';
+import { AddToCartButton } from '../cart/add-to-cart-button';
 import { PincodeButton } from '../header/pincode-button';
 import { useDelivery, useOffers, usePdp } from './pdp-context';
 
@@ -32,7 +33,7 @@ function DeliveryPromise() {
   );
 }
 
-/** Unwired until M3 (cart). */
+/** Buy Now and wishlist arrive with M4. */
 const notYet = () => {};
 
 /** PRD §6 right column: sticky buy box; everything inside is fetched live (no-store). */
@@ -85,9 +86,7 @@ export function BuyBox() {
               ))}
             </select>
           </label>
-          <Button block onClick={notYet} data-testid="add-to-cart">
-            Add to Cart
-          </Button>
+          <AddToCartButton block sku={offer.skuId} sellerId={offer.sellerId} qty={qty} price={offer.price} />
           <Button block variant="buy" onClick={notYet} data-testid="buy-now">
             Buy Now
           </Button>
@@ -157,9 +156,15 @@ export function MobileBuyBar() {
       {offer ? (
         <>
           <span className="min-w-0 shrink-0 text-lg font-semibold">{formatPrice(offer.price)}</span>
-          <Button className="flex-1" onClick={notYet}>
-            Add to Cart
-          </Button>
+          <AddToCartButton
+            className="flex-1"
+            block
+            sku={offer.skuId}
+            sellerId={offer.sellerId}
+            price={offer.price}
+            data-testid="mobile-add-to-cart"
+            errorClassName="absolute bottom-full mb-1 rounded bg-white px-2 py-1 shadow"
+          />
           <Button className="flex-1" variant="buy" onClick={notYet}>
             Buy Now
           </Button>

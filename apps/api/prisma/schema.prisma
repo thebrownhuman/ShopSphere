@@ -497,3 +497,80 @@ model SearchEvent {
   @@index([searchId])
   @@map("search_events")
 }
+
+// ---------------------------------------------------------------------------
+// Cart and wishlist (M3). Owned by src/modules/cart. SKU/offer/seller ids are plain columns
+// (no FK into catalog tables) so the cart survives catalog edits and reports them as changes.
+// ---------------------------------------------------------------------------
+
+/// One ACTIVE cart per user (partial unique index in SQL) or per guest token.
+model Cart {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String?   @map("user_id") @db.Uuid
+  /// Random token carried in the signed guest_cart cookie.
+  guestToken String?   @unique @map("guest_token")
+  /// ACTIVE | MERGED | CHECKED_OUT
+  status     String    @default("ACTIVE")
+  version    Int       @default(0)
+  expiresAt  DateTime? @map("expires_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  items      CartItem[]
+  saved      SavedItem[]
+
+  @@index([userId])
+  @@map("carts")
+}
+
+model CartItem {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cartId        String   @map("cart_id") @db.Uuid
+  productId     String   @map("product_id") @db.Uuid
+  skuId         String   @map("sku_id") @db.Uuid
+  sellerId      String   @map("seller_id") @db.Uuid
+  offerId       String   @map("offer_id") @db.Uuid
+  qty           Int
+  /// Unit price (paise) when added; drives price-change banners.
+  priceSnapshot BigInt   @map("price_snapshot")
+  addedAt       DateTime @default(now()) @map("added_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  cart          Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, skuId, sellerId])
+  @@map("cart_items")
+}
+
+model SavedItem {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cartId        String   @map("cart_id") @db.Uuid
+  productId     String   @map("product_id") @db.Uuid
+  skuId         String   @map("sku_id") @db.Uuid
+  sellerId      String   @map("seller_id") @db.Uuid
+  priceSnapshot BigInt   @map("price_snapshot")
+  savedAt       DateTime @default(now()) @map("saved_at") @db.Timestamptz(6)
+  cart          Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, skuId, sellerId])
+  @@map("saved_items")
+}
+
+model Wishlist {
+  id        String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String         @unique @map("user_id") @db.Uuid
+  createdAt DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  items     WishlistItem[]
+
+  @@map("wishlists")
+}
+
+model WishlistItem {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  wishlistId String   @map("wishlist_id") @db.Uuid
+  productId  String   @map("product_id") @db.Uuid
+  skuId      String   @map("sku_id") @db.Uuid
+  addedAt    DateTime @default(now()) @map("added_at") @db.Timestamptz(6)
+  wishlist   Wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
+
+  @@unique([wishlistId, skuId])
+  @@map("wishlist_items")
+}

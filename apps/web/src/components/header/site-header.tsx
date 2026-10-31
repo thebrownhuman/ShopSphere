@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Suspense } from 'react';
 import type { CategoryNode } from '@/lib/api/catalog.types';
+import { CartLink } from '../cart/cart-link';
 import { AccountLink } from './account-link';
 import { MegaMenu } from './mega-menu';
 import { PincodeButton } from './pincode-button';
@@ -55,33 +56,7 @@ export function SiteHeader({ categories }: { categories: CategoryNode[] }) {
               <span className="block text-xs opacity-90">Returns</span>
               <span className="font-semibold">&amp; Orders</span>
             </Link>
-            <Link
-              href="/cart"
-              aria-label="Cart, 0 items"
-              className="relative flex items-end rounded px-2 py-1 font-semibold hover:outline hover:outline-1 hover:outline-white"
-              data-testid="cart-link"
-            >
-              <svg
-                aria-hidden="true"
-                width="30"
-                height="30"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-              >
-                <path d="M3 4h2l2.4 11.2a1 1 0 0 0 1 .8h9.2a1 1 0 0 0 1-.8L20 8H6" />
-                <circle cx="9" cy="20" r="1.4" />
-                <circle cx="17" cy="20" r="1.4" />
-              </svg>
-              <span
-                aria-hidden="true"
-                className="absolute left-[18px] top-0 text-sm font-bold text-cta"
-              >
-                0
-              </span>
-              <span className="hidden text-sm sm:inline">Cart</span>
-            </Link>
+            <CartLink />
           </div>
         </div>
       </div>

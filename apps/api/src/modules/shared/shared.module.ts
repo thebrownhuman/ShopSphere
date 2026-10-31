@@ -2,6 +2,7 @@ import { Global, Module } from '@nestjs/common';
 import { AuditService } from './audit/audit.service';
 import { ConfigModule } from './config/config.module';
 import { ProcessedEventsService } from './events/processed-events.service';
+import { SignInHooks } from './events/sign-in-hooks';
 import { OutboxPublisher } from './outbox/outbox.publisher';
 import { OutboxService } from './outbox/outbox.service';
 import { PrismaModule } from './prisma/prisma.module';
@@ -11,7 +12,7 @@ import { RedisModule } from './redis/redis.module';
 @Global()
 @Module({
   imports: [ConfigModule, PrismaModule, RedisModule],
-  providers: [AuditService, OutboxService, OutboxPublisher, ProcessedEventsService],
+  providers: [AuditService, OutboxService, OutboxPublisher, ProcessedEventsService, SignInHooks],
   exports: [
     ConfigModule,
     PrismaModule,
@@ -19,6 +20,7 @@ import { RedisModule } from './redis/redis.module';
     AuditService,
     OutboxService,
     ProcessedEventsService,
+    SignInHooks,
   ],
 })
 export class SharedModule {}

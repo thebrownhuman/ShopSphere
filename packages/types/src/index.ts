@@ -88,3 +88,7 @@ export interface PincodeInfo {
 // ───────── Catalog, search, home (M2) ─────────
 
 export * from './catalog';
+
+// ───────── Cart and wishlist (M3) ─────────
+
+export * from './cart';

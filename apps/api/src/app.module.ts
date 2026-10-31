@@ -1,5 +1,6 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { CartModule } from './modules/cart/cart.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { HealthModule } from './modules/health/health.module';
 import { HomeModule } from './modules/home/home.module';
@@ -21,6 +22,7 @@ import { SharedModule } from './modules/shared/shared.module';
     CatalogModule,
     SearchModule,
     HomeModule,
+    CartModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },

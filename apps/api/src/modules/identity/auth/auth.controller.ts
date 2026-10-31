@@ -17,6 +17,7 @@ import { IdentityConfig } from '../identity.config';
 import { COOKIES, CookiesService } from '../security/cookies.service';
 import { CsrfGuard } from '../security/csrf.guard';
 import { SessionService, type SessionContext } from '../tokens/session.service';
+import { SignInHooks } from '../../shared/events/sign-in-hooks';
 import { AuthService, type AuthResult } from './auth.service';
 import { GoogleService } from './google.service';
 
@@ -33,6 +34,8 @@ export class AuthController {
     private readonly cookies: CookiesService,
     private readonly google: GoogleService,
     private readonly config: IdentityConfig,
+    // M3.5: lets other modules (cart merge) react to sign-in without identity importing them.
+    private readonly signInHooks: SignInHooks,
   ) {}
 
   @Post('identify')
@@ -64,7 +67,7 @@ export class AuthController {
       keepSignedIn,
       this.ctx(req, res),
     );
-    return this.respond(result, res);
+    return this.respond(result, req, res);
   }
 
   @Post('signup')
@@ -77,7 +80,7 @@ export class AuthController {
   ) {
     const { signupToken, name, password } = signupSchema.parse(body);
     const result = await this.auth.completeSignup(signupToken, name, password, this.ctx(req, res));
-    return this.respond(result, res);
+    return this.respond(result, req, res);
   }
 
   @Post('login')
@@ -96,7 +99,7 @@ export class AuthController {
       captchaToken,
       this.ctx(req, res),
     );
-    return this.respond(result, res);
+    return this.respond(result, req, res);
   }
 
   @Post('mfa/verify')
@@ -104,7 +107,7 @@ export class AuthController {
   @RateLimit({ limit: 20, windowSeconds: 15 * 60 })
   async mfa(@Body() body: unknown, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const { mfaToken, code } = mfaSchema.parse(body);
-    return this.respond(await this.auth.verifyMfa(mfaToken, code, this.ctx(req, res)), res);
+    return this.respond(await this.auth.verifyMfa(mfaToken, code, this.ctx(req, res)), req, res);
   }
 
   @Post('password/forgot')
@@ -202,6 +205,7 @@ export class AuthController {
       }
       if (result.status === 'authenticated') {
         this.cookies.setSession(res, result.tokens, result.user);
+        await this.signInHooks.run({ userId: result.user.id, req, res }); // M3.5 sign-in hook
       }
       // The web app picks up the session via /auth/refresh on load.
       return res.redirect(`${web}${returnTo}`);
@@ -219,10 +223,11 @@ export class AuthController {
     };
   }
 
-  private async respond(result: AuthResult, res: Response): Promise<AuthResponse> {
+  private async respond(result: AuthResult, req: Request, res: Response): Promise<AuthResponse> {
     if (result.status !== 'authenticated') return result;
     const user = await this.auth.getAuthUser(result.user.id);
     this.cookies.setSession(res, result.tokens, user);
+    await this.signInHooks.run({ userId: user.id, req, res }); // M3.5 sign-in hook
     return {
       status: 'authenticated',
       accessToken: result.tokens.accessToken,

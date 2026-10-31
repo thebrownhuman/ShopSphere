@@ -2,21 +2,24 @@ import { Badge, Price, RatingStars, cx } from '@shopsphere/ui';
 import Link from 'next/link';
 import type { ProductSummary } from '@/lib/api/catalog.types';
 import { deliveryLabel } from '@/lib/delivery';
+import { AddToCartButton } from './cart/add-to-cart-button';
 import { CatalogImage } from './catalog-image';
 
 /**
  * PRD §4 product tile: 1:1 image, 2-line title, rating + count, price + struck MRP + % off,
- * Plus badge, delivery date. The whole tile is one link; quick Add to cart arrives with M3.
+ * Plus badge, delivery date, quick Add to cart (M3.7). The tile is one link; the button sits above it.
  */
 export function ProductTile({
   product,
   priority = false,
   compact = false,
+  addToCart = true,
   sizes = '(min-width: 1440px) 16vw, (min-width: 1024px) 22vw, (min-width: 640px) 30vw, 45vw',
 }: {
   product: ProductSummary;
   priority?: boolean;
   compact?: boolean;
+  addToCart?: boolean;
   sizes?: string;
 }) {
   const p = product;
@@ -65,6 +68,16 @@ export function ProductTile({
             </p>
           ) : null}
         </div>
+      )}
+      {addToCart && p.inStock && p.price > 0 && (
+        <AddToCartButton
+          sku={p.skuId}
+          price={p.price}
+          size="sm"
+          variant="secondary"
+          className="mt-auto pt-2"
+          aria-label={`Add ${p.title} to cart`}
+        />
       )}
     </article>
   );
