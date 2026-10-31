@@ -98,6 +98,36 @@ pnpm --filter @shopsphere/web exec playwright install chromium
 pnpm --filter @shopsphere/web test:e2e
 # non-default compose ports: E2E_DATABASE_URL=postgresql://shopsphere:shopsphere@localhost:5440/shopsphere_e2e E2E_REDIS_URL=redis://localhost:6390/5
 ```
+## Milestone 2 backend (catalog, search, home)
+
+Done: M2.1–M2.12, M2.15, M2.21 (backend), M2.24. Modules: `apps/api/src/modules/{catalog,search,pricing,delivery,home}`;
+workers: `apps/workers/src/{search,images}`. Contract types: `packages/types/src/catalog.ts`.
+
+| Endpoint | Notes |
+| --- | --- |
+| `GET /home` | CMS rows from `home_sections`, filtered by audience (guest / signed-in) and time window; personalised rows use the bearer token or `X-Guest-Id` |
+| `GET /categories` | tree from the materialized-path `categories` table |
+| `GET /products/:slug?sku=` | content, variants, per-SKU buy-box, also-viewed |
+| `GET /products/:id/offers?sku=` | live offers, buy-box first (`no-store`) |
+| `GET /delivery-estimate?sku&pincode[&offerId]` | zone stub on pincode prefixes, IST cutoff countdown, no Sunday delivery |
+| `GET /search`, `GET /search/suggest`, `POST /search/click` | OpenSearch; filters `category, brand, minPrice, maxPrice, rating, discount, plus, inStock, attr.<key>`; analytics in `search_events` |
+| `GET/POST /recently-viewed` | last 20 per user / guest; first views feed `co_views` |
+
+- Buy-box v1: `0.60 × cheapest/price + 0.25 × rating/5 + 0.15 × fastestSLA/SLA`, ties go to first party.
+- Prices are GST inclusive; the GST rate is per category (basis points, inherited from the parent).
+- Sellers include ShopSphere's own fulfilment centres (`is_first_party`, "Fulfilled by ShopSphere").
+- Indexer: catalog writes enqueue `product.changed` / `offer.changed` in the outbox; the worker calls
+  `POST /search/internal/index` every 2 s. Stock-only changes are debounced (one reindex per product per 60 s).
+  Full rebuild: `POST /search/internal/reindex-all` (both need `x-internal-token`).
+- Images: the seed uses generated SVG placeholders served by `GET /media/ph/:seed`. Uploaded originals
+  (`product_images.status = PENDING`) are rendered to WebP/AVIF at 100/300/600/1200 px by the image worker (sharp → S3).
+- Seed: `pnpm db:seed` loads 42 categories and ~5,000 products (~12 s including indexing). `SEED_RESET=1` rebuilds,
+  `SEED_PRODUCTS=n` resizes, `SEED_REINDEX=1` only rebuilds the index.
+- Search integration test (needs OpenSearch from docker-compose): `pnpm --filter @shopsphere/api test:int`.
+
+TODO: phonetic analyzer (needs the analysis-phonetic plugin), seller image upload API (M5), BullMQ instead of
+interval schedulers.
+
 ## Payments (M4.10–M4.18 foundation, ahead of checkout)
 
 `apps/api/src/modules/payment` + `apps/bank-sim` (see its README for test cards and protocol).

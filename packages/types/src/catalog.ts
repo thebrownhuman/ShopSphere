@@ -315,9 +315,16 @@ export type HomeSection =
   | (HomeSectionBase & { type: 'HERO_CAROUSEL'; banners: Banner[] })
   | (HomeSectionBase & { type: 'QUAD_CARDS'; cards: QuadCard[] })
   | (HomeSectionBase & { type: 'DEAL_ROW'; deals: DealItem[]; seeAllHref: string | null })
-  | (HomeSectionBase & { type: 'PRODUCT_CAROUSEL'; products: ProductCard[]; seeAllHref: string | null })
+  | (HomeSectionBase & {
+      type: 'PRODUCT_CAROUSEL';
+      products: ProductCard[];
+      seeAllHref: string | null;
+    })
   | (HomeSectionBase & { type: 'RECENTLY_VIEWED'; products: ProductCard[] })
-  | (HomeSectionBase & { type: 'CATEGORY_TILES'; categories: (CategoryCrumb & { image: string | null })[] });
+  | (HomeSectionBase & {
+      type: 'CATEGORY_TILES';
+      categories: (CategoryCrumb & { image: string | null })[];
+    });
 
 /** GET /home  (signed-in users get history-based rows; guests send X-Guest-Id for recently viewed) */
 export interface HomeResponse {

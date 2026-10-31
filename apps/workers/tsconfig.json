@@ -1,5 +1,5 @@
 {
   "extends": "@shopsphere/config/tsconfig.node.json",
-  "compilerOptions": { "outDir": "dist", "rootDir": "src" },
+  "compilerOptions": { "outDir": "dist", "rootDir": "src", "types": ["node", "jest"] },
   "include": ["src"]
 }
