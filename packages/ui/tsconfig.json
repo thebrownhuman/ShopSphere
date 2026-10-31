@@ -1,5 +1,10 @@
 {
   "extends": "@shopsphere/config/tsconfig.node.json",
-  "compilerOptions": { "outDir": "dist", "rootDir": "src" },
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "jsx": "react-jsx",
+    "lib": ["dom", "ES2022"]
+  },
   "include": ["src"]
 }

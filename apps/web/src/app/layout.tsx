@@ -1,39 +1,38 @@
-import type { Metadata } from 'next';
-import Link from 'next/link';
+import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
-import { getSessionHint } from '@/lib/session-cookie';
+import { SiteHeader } from '@/components/header/site-header';
+import { SiteFooter } from '@/components/site-footer';
+import { getCategories } from '@/lib/api/catalog';
+import { SITE_URL } from '@/lib/site';
 import './globals.css';
 import { Providers } from './providers';
 
 export const metadata: Metadata = {
-  title: 'ShopSphere',
-  description: 'ShopSphere: simulated multi-vendor marketplace',
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: 'ShopSphere: Online Shopping for Electronics, Fashion & More',
+    template: '%s | ShopSphere',
+  },
+  description:
+    'Shop mobiles, electronics, fashion, home and grocery with fast delivery from ShopSphere warehouses and trusted sellers.',
+  openGraph: { siteName: 'ShopSphere', type: 'website', locale: 'en_IN' },
 };
 
+export const viewport: Viewport = { themeColor: '#172337', width: 'device-width', initialScale: 1 };
+
 export default async function RootLayout({ children }: { children: ReactNode }) {
-  // SSR greeting from the signed session cookie; no API round-trip needed.
-  const session = await getSessionHint();
+  // No cookies() here: the layout must stay static so home/category/PDP can be ISR-cached.
+  const categories = await getCategories().catch(() => []);
   return (
     <html lang="en-IN">
-      <body className="min-h-screen bg-slate-50 text-slate-900 antialiased">
-        <header className="bg-brand px-4 py-3 text-white">
-          <div className="mx-auto flex max-w-6xl items-center justify-between">
-            <Link href="/" className="text-lg font-bold">
-              ShopSphere
-            </Link>
-            <Link
-              href={session ? '/account' : '/signin'}
-              className="rounded px-2 py-1 text-sm hover:bg-white/10"
-              data-testid="account-link"
-            >
-              <span className="block text-xs opacity-80">
-                Hello, {session ? (session.name ?? 'there') : 'Sign in'}
-              </span>
-              <span className="font-semibold">Account &amp; Lists</span>
-            </Link>
+      <body id="top" className="min-h-screen bg-slate-100 text-slate-900 antialiased">
+        <Providers>
+          <SiteHeader categories={categories} />
+          <div id="main" tabIndex={-1} className="outline-none">
+            {children}
           </div>
-        </header>
-        <Providers>{children}</Providers>
+          <SiteFooter />
+        </Providers>
       </body>
     </html>
   );
