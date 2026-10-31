@@ -6,6 +6,7 @@ import { NOTIFICATION_CONFIG, type NotificationConfig } from './notification.con
 import { NOTIFICATION_DIRECTORY, type NotificationDirectory } from './directory';
 import { PreferencesStore } from './preferences';
 import { renderNotification, type NotificationEvent } from './templates';
+import { WebPushService } from './web-push.service';
 
 const CONSUMER = 'notification.order-events';
 const FEED_PAGE = 100;
@@ -27,7 +28,7 @@ export interface FeedEvent {
 
 /**
  * Notifications v1 (M4.31): renders the template for an order event, applies the recipient's
- * preferences and sends email + SMS. At most once per event id: the processed-event marker and
+ * preferences and sends email + SMS, plus WhatsApp and web push (M6.9) where opted in. At most once per event id: the processed-event marker and
  * the sends share one transaction, so a failed send rolls the marker back and the worker retries.
  */
 @Injectable()
@@ -41,6 +42,7 @@ export class NotificationService {
     private readonly processed: ProcessedEventsService,
     private readonly prisma: PrismaService,
     @Inject(NOTIFICATION_DIRECTORY) private readonly directory: NotificationDirectory,
+    private readonly push: WebPushService,
   ) {}
 
   async dispatch(event: NotificationEvent): Promise<DispatchResult> {
@@ -61,6 +63,20 @@ export class NotificationService {
       if (to.phone && prefs.sms) {
         await this.channels.sms(to.phone, msg.sms);
         sent.push('sms');
+      }
+      if (to.phone && prefs.whatsapp) {
+        await this.channels.whatsapp(to.phone, msg.whatsapp);
+        sent.push('whatsapp');
+      }
+      if (prefs.push) {
+        const url = `${this.cfg.WEB_URL}/orders/${encodeURIComponent(orderId)}`;
+        const n = await this.push.send(userId, {
+          title: msg.email.subject,
+          body: msg.sms.replace(/^ShopSphere: /, ''),
+          url,
+          tag: `order-${orderId}`,
+        });
+        if (n > 0) sent.push('push');
       }
     });
     if (!processed) this.logger.log(`event ${event.id} already processed`);

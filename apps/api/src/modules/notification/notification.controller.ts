@@ -1,4 +1,15 @@
-import { Body, Controller, Get, HttpCode, Post, Put, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Post,
+  Put,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import type { PushPublicKey } from '@shopsphere/types';
 import { z } from 'zod';
 import { AccessTokenGuard, Auth } from '../identity/security/access-token.guard';
 import type { AccessClaims } from '../identity/tokens/session.service';
@@ -8,6 +19,7 @@ import { NotificationInternalGuard } from './notification.config';
 import { NotificationService } from './notification.service';
 import { preferencesPatchSchema, PreferencesStore } from './preferences';
 import { NOTIFIED_TYPES, type NotificationEvent } from './templates';
+import { WebPushService } from './web-push.service';
 
 const TYPES = NOTIFIED_TYPES;
 
@@ -67,5 +79,51 @@ export class NotificationPreferencesController {
   @Put()
   update(@Auth() auth: AccessClaims, @Body() body: unknown) {
     return this.prefs.update(auth.sub, parse(preferencesPatchSchema, body));
+  }
+}
+
+const pushSubSchema = z.object({
+  endpoint: z.string().url().max(1000),
+  keys: z.object({ p256dh: z.string().min(1).max(200), auth: z.string().min(1).max(100) }),
+});
+
+/** Web push (M6.9): VAPID key for the browser, and its subscriptions. */
+@Controller('notifications/push')
+export class PushSubscriptionsController {
+  constructor(private readonly push: WebPushService) {}
+
+  @Get('key')
+  key(): PushPublicKey {
+    return { publicKey: this.push.publicKey };
+  }
+
+  @Post('subscriptions')
+  @HttpCode(204)
+  @UseGuards(AccessTokenGuard)
+  async subscribe(@Auth() auth: AccessClaims, @Body() body: unknown): Promise<void> {
+    await this.push.subscribe(auth.sub, parse(pushSubSchema, body));
+  }
+
+  @Delete('subscriptions')
+  @HttpCode(204)
+  @UseGuards(AccessTokenGuard)
+  async unsubscribe(@Auth() auth: AccessClaims, @Body() body: unknown): Promise<void> {
+    await this.push.unsubscribe(
+      auth.sub,
+      parse(pushSubSchema.pick({ endpoint: true }), body).endpoint,
+    );
+  }
+
+  /** Sends a test notification to the caller's browsers (Account → Notifications). */
+  @Post('test')
+  @HttpCode(200)
+  @UseGuards(AccessTokenGuard)
+  async test(@Auth() auth: AccessClaims): Promise<{ delivered: number }> {
+    const delivered = await this.push.send(auth.sub, {
+      title: 'ShopSphere notifications are on',
+      body: 'You will get order updates in this browser.',
+      url: '/account/notifications',
+    });
+    return { delivered };
   }
 }

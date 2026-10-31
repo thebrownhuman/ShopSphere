@@ -32,7 +32,7 @@ export function readCookie(name: string): string | undefined {
 }
 
 export interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
   accessToken?: string | null;
   /** Extra headers, e.g. `idempotency-key`. */

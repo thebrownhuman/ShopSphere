@@ -1,3 +1,4 @@
+import { ReturnsModule } from '../returns/returns.module';
 import { Module } from '@nestjs/common';
 import { IdentityModule } from '../identity/identity.module';
 import { OrderModule } from '../order/order.module';
@@ -17,6 +18,7 @@ import { FulfilmentService } from './fulfilment.service';
     OrderModule,
     ShippingModule,
     SettlementModule,
+    ReturnsModule,
   ],
   controllers: [SellerOrdersController, ShippingController],
   providers: [FulfilmentService],

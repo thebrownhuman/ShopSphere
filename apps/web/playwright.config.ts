@@ -18,7 +18,7 @@ export const MAILPIT_URL = process.env.E2E_MAILPIT_URL ?? 'http://localhost:8025
 export default defineConfig({
   testDir: './e2e',
   // Mock journeys have their own configs (playwright.catalog.config.ts, playwright.checkout.config.ts).
-  testIgnore: /(catalog(-api)?|checkout(-api)?)\.spec\.ts/,
+  testIgnore: /(catalog(-api)?|checkout(-api)?|returns)\.spec\.ts/,
   timeout: 60_000,
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,

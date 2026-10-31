@@ -9,6 +9,7 @@ import type { OrderEventPayloads } from '@shopsphere/types';
  *   order.status_changed SHIPPED        -> "shipped"
  *   order.status_changed DELIVERED      -> "delivered"
  *   order.cancelled (incl. NO_STOCK)    -> "cancelled" / apology
+ *   order.status_changed RETURN_REQUESTED / PICKED_UP / REFUNDED -> return updates (M6.1)
  * The events carry ids only, so the service resolves the recipient and item titles first.
  */
 
@@ -48,6 +49,8 @@ export interface RenderedNotification {
   email: { subject: string; text: string };
   /** Kept under 160 characters (one SMS segment). */
   sms: string;
+  /** WhatsApp text (M6.9): bold subject line + the SMS text. */
+  whatsapp: string;
 }
 
 /** ₹1,23,456 (no paise when whole). */
@@ -86,6 +89,22 @@ export function renderNotification(
   ctx: OrderContext,
   webUrl: string,
 ): RenderedNotification | null {
+  const msg = render(e, to, ctx, webUrl);
+  return (
+    msg && {
+      ...msg,
+      whatsapp: `*${msg.email.subject}*
+${msg.sms}`,
+    }
+  );
+}
+
+function render(
+  e: NotificationEvent,
+  to: Recipient,
+  ctx: OrderContext,
+  webUrl: string,
+): Omit<RenderedNotification, 'whatsapp'> | null {
   const p = e.payload;
   const hi = `Hi ${firstName(to.name)},`;
   const orderUrl = `${webUrl}/orders/${encodeURIComponent(p.orderId)}`;
@@ -184,7 +203,7 @@ export function renderNotification(
           sms: clip(`ShopSphere: ${what} from order ${p.orderNumber} was delivered. ${orderUrl}`),
         };
       }
-      return null;
+      return renderReturn(e.payload, what, orderUrl, mail);
     }
     case 'order.cancelled': {
       const refund = e.payload.refunds.reduce((t, r) => t + r.amountPaise, 0);
@@ -216,4 +235,70 @@ export function renderNotification(
       };
     }
   }
+}
+
+/** Return updates (M6.1); payload fields from ReturnsService transitions. */
+function renderReturn(
+  p: NotificationEvent['payload'] & { status: string },
+  what: string,
+  orderUrl: string,
+  mail: (subject: string, lines: string[]) => { subject: string; text: string },
+): Omit<RenderedNotification, 'whatsapp'> | null {
+  const extra = p as unknown as {
+    pickupDate?: string;
+    refundTo?: string;
+    refunds?: { destination: string; amountPaise: number }[];
+  };
+  if (p.status === 'RETURN_REQUESTED') {
+    const on = day(extra.pickupDate ?? null);
+    return {
+      category: 'ORDER_UPDATES',
+      emailMandatory: false,
+      email: mail(`Return requested: ${what}`, [
+        `We've received your return request for order ${p.orderNumber}.`,
+        `${on ? `A courier will pick it up on ${on}` : 'A courier will pick it up soon'} from your delivery address. Please keep the item packed with its tags and accessories.`,
+        '',
+        orderUrl,
+      ]),
+      sms: clip(
+        `ShopSphere: Return for order ${p.orderNumber} requested.${on ? ` Pickup on ${on}.` : ''} ${orderUrl}`,
+      ),
+    };
+  }
+  if (p.status === 'PICKED_UP') {
+    return {
+      category: 'ORDER_UPDATES',
+      emailMandatory: false,
+      email: mail(`Return picked up: ${what}`, [
+        `Your return for order ${p.orderNumber} has been picked up.`,
+        'Your refund is issued as soon as the seller receives and checks the item.',
+        '',
+        orderUrl,
+      ]),
+      sms: clip(
+        `ShopSphere: Return for order ${p.orderNumber} picked up. Refund follows the quality check.`,
+      ),
+    };
+  }
+  if (p.status === 'REFUNDED') {
+    const refunds = extra.refunds ?? [];
+    const total = refunds.reduce((t, r) => t + r.amountPaise, 0);
+    const instant = extra.refundTo === 'STORE_BALANCE';
+    return {
+      category: 'ORDER_UPDATES',
+      emailMandatory: true,
+      email: mail(`Refund of ${inr(total)} issued for order ${p.orderNumber}`, [
+        `Your return for order ${p.orderNumber} passed the quality check.`,
+        instant
+          ? `${inr(total)} has been added to your ShopSphere Pay balance and is ready to use.`
+          : `${inr(total)} is on its way to your original payment method (5–7 working days).`,
+        '',
+        orderUrl,
+      ]),
+      sms: clip(
+        `ShopSphere: Refund of ${inr(total)} for order ${p.orderNumber} ${instant ? 'added to your ShopSphere Pay balance' : 'issued to your original payment method'}.`,
+      ),
+    };
+  }
+  return null;
 }

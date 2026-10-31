@@ -2,6 +2,7 @@ import type Redis from 'ioredis';
 import type { ProcessedEventsService } from '../shared/events/processed-events.service';
 import type { PrismaService } from '../shared/prisma/prisma.service';
 import type { NotificationChannels } from './channels';
+import type { WebPushService } from './web-push.service';
 import { loadNotificationConfig } from './notification.config';
 import { NotificationService } from './notification.service';
 import { PreferencesStore } from './preferences';
@@ -157,6 +158,30 @@ describe('templates', () => {
     expect(r.email.subject).toContain('Sorry');
     expect(r.email.text).toContain('refund of ₹18,398');
   });
+
+  it('return requested / picked up / refunded (M6.1) render, with a WhatsApp text', () => {
+    const ev = (status: string, extra: object) =>
+      ({
+        id: `evt-r-${status}`,
+        type: 'order.status_changed',
+        payload: { ...base, status, fromStatus: 'DELIVERED', ...extra },
+      }) as unknown as NotificationEvent;
+    const requested = render(ev('RETURN_REQUESTED', { pickupDate: '2026-11-05' }));
+    expect(requested.email.subject).toBe('Return requested: Redmi Note 13 5G and 1 more');
+    expect(requested.sms).toMatch(/Pickup on .*5 Nov/);
+    expect(requested.whatsapp.startsWith('*Return requested')).toBe(true);
+    expect(render(ev('PICKED_UP', {})).sms).toContain('picked up');
+    const refunded = render(
+      ev('REFUNDED', {
+        refundTo: 'STORE_BALANCE',
+        refunds: [{ destination: 'STORE_BALANCE', amountPaise: 1_839_800 }],
+      }),
+    );
+    expect(refunded.emailMandatory).toBe(true);
+    expect(refunded.email.subject).toBe('Refund of ₹18,398 issued for order OD200001');
+    expect(refunded.sms).toContain('ShopSphere Pay balance');
+    expect(refunded.sms.length).toBeLessThanOrEqual(160);
+  });
 });
 
 function setup(phoneless = false) {
@@ -164,7 +189,17 @@ function setup(phoneless = false) {
   const channels: NotificationChannels = {
     email: async (to, subject) => void sent.push(`email:${to}:${subject}`),
     sms: async (to) => void sent.push(`sms:${to}`),
+    whatsapp: async (to) => void sent.push(`whatsapp:${to}`),
   };
+  const pushed: string[] = [];
+  const subscribed = new Set<string>();
+  const push = {
+    send: async (userId: string, msg: { title: string }) => {
+      if (!subscribed.has(userId)) return 0;
+      pushed.push(`${userId}:${msg.title}`);
+      return 1;
+    },
+  } as unknown as WebPushService;
   const done = new Set<string>();
   const processed = {
     runOnce: async (consumer: string, id: string, handler: () => Promise<void>) => {
@@ -186,8 +221,9 @@ function setup(phoneless = false) {
     processed,
     {} as PrismaService,
     directory,
+    push,
   );
-  return { service, sent, prefs };
+  return { service, sent, prefs, pushed, subscribed };
 }
 
 describe('NotificationService.dispatch', () => {
@@ -221,6 +257,17 @@ describe('NotificationService.dispatch', () => {
     expect(await service.dispatch(packed)).toEqual({ processed: true, sent: [] });
   });
 
+  it('sends WhatsApp only when opted in, and web push to subscribed browsers', async () => {
+    const { service, prefs, sent, pushed, subscribed } = setup();
+    await prefs.update('u1', { ORDER_UPDATES: { whatsapp: true } });
+    subscribed.add('u1');
+    expect((await service.dispatch(shipped)).sent).toEqual(['email', 'sms', 'whatsapp', 'push']);
+    expect(sent).toContain('whatsapp:+919876543210');
+    expect(pushed).toEqual(['u1:Shipped: Redmi Note 13 5G and 1 more']);
+    await prefs.update('u1', { ORDER_UPDATES: { push: false } });
+    expect((await service.dispatch(delivered)).sent).toEqual(['email', 'sms', 'whatsapp']);
+  });
+
   it('propagates send failures so the worker retries', async () => {
     const { service } = setup();
     (service as unknown as { channels: NotificationChannels }).channels.sms = async () => {
@@ -234,12 +281,17 @@ describe('PreferencesStore', () => {
   it('defaults everything on and merges partial updates', async () => {
     const prefs = new PreferencesStore(new HashRedis() as unknown as Redis);
     expect(await prefs.get('u2')).toEqual({
-      ORDER_UPDATES: { email: true, sms: true },
-      PAYMENT_ALERTS: { email: true, sms: true },
+      ORDER_UPDATES: { email: true, sms: true, whatsapp: false, push: true },
+      PAYMENT_ALERTS: { email: true, sms: true, whatsapp: false, push: true },
     });
-    expect(await prefs.update('u2', { PAYMENT_ALERTS: { sms: false } })).toEqual({
-      ORDER_UPDATES: { email: true, sms: true },
-      PAYMENT_ALERTS: { email: true, sms: false },
+    expect(
+      await prefs.update('u2', {
+        PAYMENT_ALERTS: { sms: false },
+        ORDER_UPDATES: { whatsapp: true },
+      }),
+    ).toEqual({
+      ORDER_UPDATES: { email: true, sms: true, whatsapp: true, push: true },
+      PAYMENT_ALERTS: { email: true, sms: false, whatsapp: false, push: true },
     });
   });
 });

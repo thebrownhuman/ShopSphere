@@ -9,15 +9,19 @@ import type { NotificationCategory } from './templates';
  *
  * Stored as one Redis hash per user (`notif:prefs:<userId>`, field `<category>.<channel>` = 0|1)
  * for v1, which keeps this module free of a migration while the order schema lands; move to a
- * Postgres table when preferences grow (marketing opt-ins, WhatsApp, quiet hours).
+ * Postgres table when preferences grow (marketing opt-ins, quiet hours).
+ * WhatsApp is opt-in (off by default, per WhatsApp Business policy); browser push is on but only
+ * reaches browsers that subscribed (M6.9).
  */
-export type Channel = 'email' | 'sms';
+export type Channel = 'email' | 'sms' | 'whatsapp' | 'push';
 export type NotificationPreferences = Record<NotificationCategory, Record<Channel, boolean>>;
 
 export const CATEGORIES: NotificationCategory[] = ['ORDER_UPDATES', 'PAYMENT_ALERTS'];
-const CHANNELS: Channel[] = ['email', 'sms'];
+const CHANNELS: Channel[] = ['email', 'sms', 'whatsapp', 'push'];
 
-const channelSchema = z.object({ email: z.boolean(), sms: z.boolean() }).partial();
+const channelSchema = z
+  .object({ email: z.boolean(), sms: z.boolean(), whatsapp: z.boolean(), push: z.boolean() })
+  .partial();
 export const preferencesPatchSchema = z
   .object({ ORDER_UPDATES: channelSchema, PAYMENT_ALERTS: channelSchema })
   .partial()
@@ -28,8 +32,8 @@ const key = (userId: string) => `notif:prefs:${userId}`;
 
 export function defaults(): NotificationPreferences {
   return {
-    ORDER_UPDATES: { email: true, sms: true },
-    PAYMENT_ALERTS: { email: true, sms: true },
+    ORDER_UPDATES: { email: true, sms: true, whatsapp: false, push: true },
+    PAYMENT_ALERTS: { email: true, sms: true, whatsapp: false, push: true },
   };
 }
 

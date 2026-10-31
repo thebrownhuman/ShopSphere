@@ -12,11 +12,20 @@ export const NOTIFICATION_CHANNELS = Symbol('NOTIFICATION_CHANNELS');
 export interface NotificationChannels {
   email(to: string, subject: string, text: string): Promise<void>;
   sms(phone: string, text: string): Promise<void>;
+  /** WhatsApp Business template message (M6.9). Dev: simulated, delivered to Mailpit. */
+  whatsapp(phone: string, text: string): Promise<void>;
+}
+
+/** Mailpit inbox standing in for a WhatsApp number. */
+export function whatsappMailbox(phone: string): string {
+  return `wa-${phone.replace('+', '')}@whatsapp.shopsphere.test`;
 }
 
 /**
  * Simulation channels, same scheme as identity's DevNotificationProvider: email goes to Mailpit
- * at the real address, SMS goes to Mailpit at smsMailbox(phone) so texts are visible locally.
+ * at the real address, SMS goes to Mailpit at smsMailbox(phone) and WhatsApp to
+ * whatsappMailbox(phone), so texts are visible locally. A real WhatsApp Business API adapter
+ * (Gupshup/Meta Cloud API) implements the same method.
  */
 @Injectable()
 export class MailpitChannels implements NotificationChannels {
@@ -38,6 +47,16 @@ export class MailpitChannels implements NotificationChannels {
       from: this.cfg.MAIL_FROM,
       to: smsMailbox(phone),
       subject: `SMS to ${phone}`,
+      text,
+    });
+  }
+
+  async whatsapp(phone: string, text: string): Promise<void> {
+    this.logger.log(`[whatsapp] ${phone}: ${text}`);
+    await this.transport.sendMail({
+      from: this.cfg.MAIL_FROM,
+      to: whatsappMailbox(phone),
+      subject: `WhatsApp to ${phone}`,
       text,
     });
   }

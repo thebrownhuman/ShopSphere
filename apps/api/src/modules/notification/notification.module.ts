@@ -6,7 +6,9 @@ import { NOTIFICATION_DIRECTORY, PrismaNotificationDirectory } from './directory
 import {
   NotificationInternalController,
   NotificationPreferencesController,
+  PushSubscriptionsController,
 } from './notification.controller';
+import { WebPushService } from './web-push.service';
 import {
   loadNotificationConfig,
   NOTIFICATION_CONFIG,
@@ -21,7 +23,11 @@ import { PreferencesStore } from './preferences';
  */
 @Module({
   imports: [IdentityModule, OrderModule],
-  controllers: [NotificationInternalController, NotificationPreferencesController],
+  controllers: [
+    NotificationInternalController,
+    NotificationPreferencesController,
+    PushSubscriptionsController,
+  ],
   providers: [
     { provide: NOTIFICATION_CONFIG, useFactory: () => loadNotificationConfig(process.env) },
     { provide: NOTIFICATION_CHANNELS, useClass: MailpitChannels },
@@ -29,6 +35,7 @@ import { PreferencesStore } from './preferences';
     NotificationInternalGuard,
     NotificationService,
     PreferencesStore,
+    WebPushService,
   ],
   exports: [NotificationService],
 })

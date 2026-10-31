@@ -1001,3 +1001,85 @@ model SellerMedia {
   @@index([sellerAccountId])
   @@map("seller_media")
 }
+
+// ───────── M6.1 Returns, M6.8 Support, M6.9 Web push ─────────
+
+/// One return per order (the order state machine is order level). Status: REQUESTED →
+/// PICKUP_SCHEDULED → PICKED_UP → IN_TRANSIT → RECEIVED → QC_PASSED → REFUNDED, or QC_FAILED.
+model ReturnRequest {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId      String    @unique @map("order_id") @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  sellerId     String    @map("seller_id") @db.Uuid
+  reason       String
+  comment      String?
+  /// ORIGINAL | STORE_BALANCE
+  refundTo     String    @map("refund_to")
+  status       String    @default("REQUESTED")
+  amountPaise  BigInt    @map("amount_paise")
+  /// YYYY-MM-DD (IST) chosen pickup day.
+  pickupDate   String    @map("pickup_date")
+  courier      String?
+  awb          String?
+  trackingSeq  Int       @default(0) @map("tracking_seq")
+  qcNote       String?   @map("qc_note")
+  pickedUpAt   DateTime? @map("picked_up_at") @db.Timestamptz(6)
+  receivedAt   DateTime? @map("received_at") @db.Timestamptz(6)
+  qcAt         DateTime? @map("qc_at") @db.Timestamptz(6)
+  refundedAt   DateTime? @map("refunded_at") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tracking     ReturnTrackingEvent[]
+
+  @@unique([courier, awb], map: "uq_returns_courier_awb")
+  @@index([userId, createdAt])
+  @@index([sellerId, status, createdAt], map: "idx_returns_seller_status")
+  @@map("return_requests")
+}
+
+model ReturnTrackingEvent {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  returnId        String        @map("return_id") @db.Uuid
+  provider        String
+  providerEventId String        @map("provider_event_id")
+  status          String
+  sequence        Int
+  location        String?
+  applied         Boolean
+  occurredAt      DateTime      @map("occurred_at") @db.Timestamptz(6)
+  receivedAt      DateTime      @default(now()) @map("received_at") @db.Timestamptz(6)
+  ret             ReturnRequest @relation(fields: [returnId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerEventId], map: "uq_return_tracking_provider_event")
+  @@index([returnId, occurredAt])
+  @@map("return_tracking_events")
+}
+
+model SupportTicket {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  number    String   @unique
+  userId    String   @map("user_id") @db.Uuid
+  orderId   String?  @map("order_id") @db.Uuid
+  category  String
+  subject   String
+  message   String
+  /// OPEN | IN_PROGRESS | RESOLVED
+  status    String   @default("OPEN")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([userId, createdAt])
+  @@map("support_tickets")
+}
+
+model PushSubscription {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId])
+  @@map("push_subscriptions")
+}
