@@ -671,11 +671,26 @@ model Shipment {
   promisedDate          String      @map("promised_date")
   status                String      @default("PENDING")
   createdAt             DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  weightGrams           Int?        @map("weight_grams")
+  courier               String?
+  awb                   String?
+  shippingCostPaise     BigInt?     @map("shipping_cost_paise")
+  /// Highest courier tracking sequence applied.
+  trackingSeq           Int         @default(0) @map("tracking_seq")
+  acceptedAt            DateTime?   @map("accepted_at") @db.Timestamptz(6)
+  packedAt              DateTime?   @map("packed_at") @db.Timestamptz(6)
+  labelAt               DateTime?   @map("label_at") @db.Timestamptz(6)
+  shippedAt             DateTime?   @map("shipped_at") @db.Timestamptz(6)
+  outForDeliveryAt      DateTime?   @map("out_for_delivery_at") @db.Timestamptz(6)
+  deliveredAt           DateTime?   @map("delivered_at") @db.Timestamptz(6)
   order                 Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
   items                 OrderItem[]
+  tracking              ShipmentTrackingEvent[]
 
+  @@unique([courier, awb], map: "uq_shipments_courier_awb")
   @@index([orderId])
   @@index([sellerId])
+  @@index([sellerId, status, createdAt], map: "idx_shipments_seller_status")
   @@map("shipments")
 }
 
@@ -841,4 +856,105 @@ model GiftCard {
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@map("gift_cards")
+}
+
+// ───────── Fulfilment, shipping, settlement (M5.5–M5.7) ─────────
+
+model SellerUser {
+  userId    String   @id @map("user_id") @db.Uuid
+  sellerId  String   @map("seller_id") @db.Uuid
+  role      String   @default("OWNER")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([sellerId])
+  @@map("seller_users")
+}
+
+model ShipmentTrackingEvent {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  shipmentId      String   @map("shipment_id") @db.Uuid
+  provider        String
+  providerEventId String   @map("provider_event_id")
+  status          String
+  sequence        Int
+  location        String?
+  /// False for duplicates/out-of-order events that changed nothing.
+  applied         Boolean
+  occurredAt      DateTime @map("occurred_at") @db.Timestamptz(6)
+  receivedAt      DateTime @default(now()) @map("received_at") @db.Timestamptz(6)
+  shipment        Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerEventId], map: "uq_tracking_provider_event")
+  @@index([shipmentId, occurredAt], map: "idx_tracking_shipment")
+  @@map("shipment_tracking_events")
+}
+
+model CourierServiceability {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider  String
+  /// ServiceabilityMatrix (shipping/courier-provider.ts).
+  matrix    Json
+  fetchedAt DateTime @default(now()) @map("fetched_at") @db.Timestamptz(6)
+
+  @@index([fetchedAt], map: "idx_courier_serviceability_fetched")
+  @@map("courier_serviceability")
+}
+
+model PayoutBatch {
+  id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cutoffAt    DateTime       @map("cutoff_at") @db.Timestamptz(6)
+  payoutCount Int            @default(0) @map("payout_count")
+  totalPaise  BigInt         @default(0) @map("total_paise")
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  payouts     SellerPayout[]
+
+  @@map("payout_batches")
+}
+
+model SellerPayout {
+  id            String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  batchId       String           @map("batch_id") @db.Uuid
+  sellerId      String           @map("seller_id") @db.Uuid
+  amountPaise   BigInt           @map("amount_paise")
+  /// PROCESSING | PAID | FAILED
+  status        String           @default("PROCESSING")
+  bankPayoutId  String?          @map("bank_payout_id")
+  utr           String?
+  failureReason String?          @map("failure_reason")
+  lineCount     Int              @map("line_count")
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  paidAt        DateTime?        @map("paid_at") @db.Timestamptz(6)
+  batch         PayoutBatch      @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  lines         SettlementLine[]
+
+  @@index([sellerId, createdAt], map: "idx_seller_payouts_seller")
+  @@index([status], map: "idx_seller_payouts_status")
+  @@map("seller_payouts")
+}
+
+model SettlementLine {
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  shipmentId       String        @unique @map("shipment_id") @db.Uuid
+  orderId          String        @map("order_id") @db.Uuid
+  orderNumber      String        @map("order_number")
+  sellerId         String        @map("seller_id") @db.Uuid
+  grossPaise       BigInt        @map("gross_paise")
+  taxablePaise     BigInt        @map("taxable_paise")
+  commissionPaise  BigInt        @map("commission_paise")
+  feesGstPaise     BigInt        @map("fees_gst_paise")
+  shippingFeePaise BigInt        @map("shipping_fee_paise")
+  tcsPaise         BigInt        @map("tcs_paise")
+  tdsPaise         BigInt        @map("tds_paise")
+  netPaise         BigInt        @map("net_paise")
+  /// PENDING | IN_PAYOUT | PAID | ON_HOLD
+  status           String        @default("PENDING")
+  deliveredAt      DateTime      @map("delivered_at") @db.Timestamptz(6)
+  eligibleAt       DateTime      @map("eligible_at") @db.Timestamptz(6)
+  payoutId         String?       @map("payout_id") @db.Uuid
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  payout           SellerPayout? @relation(fields: [payoutId], references: [id], onDelete: SetNull)
+
+  @@index([status, eligibleAt], map: "idx_settlement_lines_due")
+  @@index([sellerId, deliveredAt], map: "idx_settlement_lines_seller")
+  @@map("settlement_lines")
 }

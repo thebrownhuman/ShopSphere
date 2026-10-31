@@ -1,4 +1,33 @@
 
+## Milestone 5 fulfilment (seller queue, courier, settlement)
+
+Contract: `packages/types/src/fulfilment.ts` (routes in the file header). Seller routes need a user
+linked in `seller_users` (seller onboarding writes it).
+
+- Seller queue (M5.5): `GET /seller/orders`, `POST /seller/orders/:shipmentId/{accept,pack,label}`,
+  `GET /seller/shipments/:id` (tracking timeline), `GET /seller/shipments/:id/label.pdf`. Shipments go
+  `CONFIRMED → ACCEPTED → PACKED → LABEL_CREATED`; the order becomes PACKED when every shipment is.
+- Courier (M5.6): `apps/courier-sim` (port 4500) behind the `CourierProvider` adapter
+  (`shipping/providers`; Shiprocket/Delhivery plug in there). Signed webhooks at
+  `POST /shipping/webhooks/:provider` move shipments `SHIPPED → OUT_FOR_DELIVERY → DELIVERED`
+  (forward-only; duplicates and stragglers are recorded with `applied=false`) and the order follows its
+  slowest shipment through the M4 state machine, emitting `order.shipped`, `order.out_for_delivery`,
+  `order.delivered`. `POST /shipping/internal/sync-tracking` polls for missed webhooks.
+- Delivery estimate (M5.6a): uses the courier serviceability/SLA matrix stored by
+  `POST /shipping/internal/refresh-serviceability` (nightly); built-in zone table until the first refresh.
+- Settlement (M5.7): a `settlement_lines` row per delivered 3P shipment (commission 10%, shipping
+  fee = courier cost − buyer delivery fee, 18% GST on fees, TCS 1% of taxable, TDS 0.1% of gross;
+  `settlement/settlement-math.ts`). `POST /settlement/internal/run-payouts` (daily) pays lines due
+  T+7 after delivery, one ShopSphere Bank payout (`bank-sim POST /v1/payouts`) per seller per batch.
+  `GET /seller/payouts`, `GET /seller/payouts/:id`, `GET /seller/statements?from&to`.
+- Workers: `apps/workers/src/fulfilment/fulfilment.jobs.ts` schedules the three internal calls.
+
+Tests: `apps/api/test/fulfilment.int.spec.ts` boots courier-sim and bank-sim in-process:
+
+```bash
+corepack pnpm --filter @shopsphere/api exec jest test/fulfilment.int.spec.ts --testPathIgnorePatterns /node_modules/
+```
+
 ## Milestone 4 backend (checkout, orders, inventory, coupons, ledger, GST)
 
 Contract: `packages/types/src/checkout.ts` + `order.ts` (routes and error codes in the file headers).

@@ -3,6 +3,7 @@
  * Consumers are added per milestone. Every consumer must be idempotent via
  * ProcessedEventsService (apps/api/src/modules/shared/events).
  */
+import { fulfilmentOptionsFromEnv, startFulfilmentJobs } from './fulfilment/fulfilment.jobs';
 import { imageOptionsFromEnv, startImageJob } from './images/image.job';
 import { handleInvoiceEvent, invoiceOptionsFromEnv } from './invoices/invoice.job';
 import { handleNotifyEvent, notifyOptionsFromEnv } from './notifications/notify.job';
@@ -22,6 +23,7 @@ const stops = [
   startReconcileJob(reconcileOptionsFromEnv(process.env)),
   startIndexJob(indexOptionsFromEnv(process.env)),
   startImageJob(imageOptionsFromEnv(process.env)),
+  startFulfilmentJobs(fulfilmentOptionsFromEnv(process.env)),
 ];
 
 const invoiceOpts = invoiceOptionsFromEnv(process.env);

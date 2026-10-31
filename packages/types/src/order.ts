@@ -83,10 +83,16 @@ export interface OrderItem {
   tax: LineTax;
 }
 
+/**
+ * PENDING (unpaid) → CONFIRMED (paid) → ACCEPTED → PACKED → LABEL_CREATED by the seller (M5.5),
+ * then SHIPPED → OUT_FOR_DELIVERY → DELIVERED by courier tracking (M5.6). CANCELLED with the order.
+ */
 export type ShipmentStatus =
   | 'PENDING'
   | 'CONFIRMED'
+  | 'ACCEPTED'
   | 'PACKED'
+  | 'LABEL_CREATED'
   | 'SHIPPED'
   | 'OUT_FOR_DELIVERY'
   | 'DELIVERED'
@@ -205,6 +211,9 @@ export type OrderEventType =
   | 'order.payment_expired'
   | 'order.cancelled'
   | 'order.status_changed'
+  | 'order.shipped'
+  | 'order.out_for_delivery'
+  | 'order.delivered'
   | 'order.refund_issued';
 
 interface OrderEventBase {
@@ -282,6 +291,14 @@ export interface OrderStatusChangedPayload extends OrderEventBase {
   fromStatus: OrderStatus;
 }
 
+/** Courier-driven transitions (M5.6). One event per order transition, not per shipment. */
+export interface OrderShippingPayload extends OrderEventBase {
+  fromStatus: OrderStatus;
+  shipmentId: string;
+  courier: string;
+  awb: string;
+}
+
 export interface OrderRefundIssuedPayload extends OrderEventBase {
   destination: 'GATEWAY' | 'STORE_BALANCE';
   amountPaise: Paise;
@@ -295,5 +312,8 @@ export interface OrderEventPayloads {
   'order.payment_expired': OrderPaymentExpiredPayload;
   'order.cancelled': OrderCancelledPayload;
   'order.status_changed': OrderStatusChangedPayload;
+  'order.shipped': OrderShippingPayload;
+  'order.out_for_delivery': OrderShippingPayload;
+  'order.delivered': OrderShippingPayload;
   'order.refund_issued': OrderRefundIssuedPayload;
 }
