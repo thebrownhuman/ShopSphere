@@ -412,6 +412,7 @@ model Seller {
   cutoffHour   Int     @default(14) @map("cutoff_hour")
   status       String  @default("ACTIVE")
   offers       Offer[]
+  account      SellerAccount?
 
   @@map("sellers")
 }
@@ -957,4 +958,56 @@ model SettlementLine {
   @@index([status, eligibleAt], map: "idx_settlement_lines_due")
   @@index([sellerId, deliveredAt], map: "idx_settlement_lines_seller")
   @@map("settlement_lines")
+}
+
+// ───────── Seller Central (M5) ─────────
+
+/// Seller onboarding + KYC (M5.1). A seller is a user with one of these; `sellerId` is set on
+/// approval (first-party house accounts have no user). Bank account number is stored only as
+/// last 4 + SHA-256 (simulation, never the full number).
+model SellerAccount {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String?   @unique @map("user_id") @db.Uuid
+  sellerId         String?   @unique @map("seller_id") @db.Uuid
+  displayName      String    @map("display_name")
+  legalName        String?   @map("legal_name")
+  /// DRAFT | SUBMITTED | APPROVED | REJECTED
+  status           String    @default("DRAFT")
+  isFirstParty     Boolean   @default(false) @map("is_first_party")
+  pan              String?
+  gstin            String?
+  bankHolderName   String?   @map("bank_holder_name")
+  bankAccountLast4 String?   @map("bank_account_last4")
+  bankAccountHash  String?   @map("bank_account_hash")
+  bankIfsc         String?   @map("bank_ifsc")
+  bankNameAtBank   String?   @map("bank_name_at_bank")
+  bankVerifyRef    String?   @map("bank_verify_ref")
+  bankVerifiedAt   DateTime? @map("bank_verified_at") @db.Timestamptz(6)
+  /// PickupAddress JSON.
+  pickup           Json?
+  rejectionReason  String?   @map("rejection_reason")
+  submittedAt      DateTime? @map("submitted_at") @db.Timestamptz(6)
+  reviewedAt       DateTime? @map("reviewed_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  seller           Seller?   @relation(fields: [sellerId], references: [id])
+  media            SellerMedia[]
+
+  @@index([status, submittedAt])
+  @@map("seller_accounts")
+}
+
+/// Listing images uploaded from Seller Central (M5.2), served at GET /seller/media/:id.
+model SellerMedia {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sellerAccountId String        @map("seller_account_id") @db.Uuid
+  fileName        String        @map("file_name")
+  contentType     String        @map("content_type")
+  bytes           Bytes
+  sizeBytes       Int           @map("size_bytes")
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  account         SellerAccount @relation(fields: [sellerAccountId], references: [id], onDelete: Cascade)
+
+  @@index([sellerAccountId])
+  @@map("seller_media")
 }
