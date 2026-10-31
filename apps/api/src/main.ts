@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { AppConfig } from './modules/shared/config/config.service';
+import { reviewUploadBodyParser } from './modules/review/review.controller';
 import { sellerUploadBodyParser } from './modules/seller/seller.controller';
 
 async function bootstrap() {
@@ -14,6 +15,7 @@ async function bootstrap() {
   });
   // Larger JSON bodies only on Seller Central upload routes (base64 images / sheets).
   app.use(...sellerUploadBodyParser());
+  app.use(...reviewUploadBodyParser());
   app.enableShutdownHooks();
   await app.listen(config.get('PORT'));
 }

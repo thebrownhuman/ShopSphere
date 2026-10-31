@@ -16,6 +16,8 @@ import { IdempotencyInterceptor } from './modules/shared/idempotency/idempotency
 import { RateLimitGuard } from './modules/shared/rate-limit/rate-limit.guard';
 import { SearchModule } from './modules/search/search.module';
 import { SellerModule } from './modules/seller/seller.module';
+import { QaModule } from './modules/qa/qa.module';
+import { ReviewModule } from './modules/review/review.module';
 import { RequestIdMiddleware } from './modules/shared/request-id/request-id.middleware';
 import { SharedModule } from './modules/shared/shared.module';
 
@@ -35,6 +37,8 @@ import { SharedModule } from './modules/shared/shared.module';
     CheckoutModule,
     SellerModule,
     FulfilmentModule,
+    ReviewModule,
+    QaModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },
