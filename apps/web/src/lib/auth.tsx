@@ -30,7 +30,6 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const router = useRouter();
   const [status, setStatus] = useState<Status>('loading');
   const [user, setUserState] = useState<AuthUser | null>(null);
   const token = useRef<string | null>(null);
@@ -104,17 +103,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [refresh, clear],
   );
 
-  const logout = useCallback(
-    async (all = false) => {
-      await apiRequest(all ? '/auth/logout-all' : '/auth/logout', { method: 'POST' }).catch(
-        () => undefined,
-      );
-      clear();
-      router.push('/');
-      router.refresh();
-    },
-    [clear, router],
-  );
+  const logout = useCallback(async (all = false) => {
+    await apiRequest(all ? '/auth/logout-all' : '/auth/logout', { method: 'POST' }).catch(
+      () => undefined,
+    );
+    // Full navigation instead of clear() + router.push: clearing state first would let
+    // RequireAuth bounce to /signin, and a reload also re-renders the SSR header.
+    if (timer.current) clearTimeout(timer.current);
+    token.current = null;
+    window.location.assign('/');
+  }, []);
 
   const value = useMemo<AuthContextValue>(
     () => ({ status, user, setSession: apply, setUser: setUserState, request, logout }),

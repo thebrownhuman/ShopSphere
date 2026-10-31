@@ -70,3 +70,31 @@ OpenAPI spec exists), M0.7 (no Docker image build yet), M0.11, M0.15.
 
 TODO: M0.6 design system components, M0.8 Terraform, M0.9 CD, M0.10 observability, M0.12 feature
 flags, M0.13 long-lead business items, M0.14 analytics pipeline, OpenAPI-generated client, Docker images in CI.
+
+## Milestone 1 status (identity)
+
+Done: M1.1–M1.14 except where noted. Module: `apps/api/src/modules/identity`; pages: `/signin`,
+`/account`, `/account/security`, `/account/addresses`.
+
+- OTP (6 digits, 5-min TTL, 5 attempts, 30 s resend) via `NotificationProvider`; the dev provider logs
+  the code and delivers to Mailpit. Phone OTPs land in `sms-91XXXXXXXXXX@sms.shopsphere.test`.
+- Access JWT 15 min (memory only); rotating refresh token in HttpOnly `ss_rt` (30 days with "keep me
+  signed in", else a browser-session cookie capped at 12 h). Reusing a spent refresh token revokes the
+  session family.
+- CAPTCHA (Turnstile test keys) after 5 failed logins per account or IP in 15 min; lockout + new-device
+  alerts; TOTP 2FA; step-up re-auth (10 min) for password/email/phone/2FA changes.
+- CSRF: double-submit `ss_csrf` cookie + `x-csrf-token` header on cookie-authenticated `/auth/*`;
+  bearer-authenticated mutations need none. SSR reads the signed `ss_session` cookie
+  (`SESSION_COOKIE_SECRET` must match in api and web).
+- Google sign-in is wired but disabled until `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` are set.
+
+Not yet: guest-cart merge on sign-in (needs M3 cart), real SMS/SES adapters, full India Post pincode
+data (seed has a sample), TOTP secret encryption at rest, Delete account (DPDP).
+
+E2E (needs `pnpm infra:up`; uses its own `shopsphere_e2e` database and ports 4100/3100):
+
+```bash
+pnpm --filter @shopsphere/web exec playwright install chromium
+pnpm --filter @shopsphere/web test:e2e
+# non-default compose ports: E2E_DATABASE_URL=postgresql://shopsphere:shopsphere@localhost:5440/shopsphere_e2e E2E_REDIS_URL=redis://localhost:6390/5
+```

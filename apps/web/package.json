@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start -p 3000",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@shopsphere/types": "workspace:*",
@@ -18,6 +19,7 @@
     "react-dom": "19.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.49.1",
     "@shopsphere/config": "workspace:*",
     "@types/node": "22.10.2",
     "@types/react": "19.0.2",
