@@ -10,6 +10,7 @@ export const STATUS_LABEL: Record<OrderStatus, string> = {
   OUT_FOR_DELIVERY: 'Out for delivery',
   DELIVERED: 'Delivered',
   CANCELLED: 'Cancelled',
+  CANCELLED_NO_STOCK: 'Cancelled (sold out)',
   RETURN_REQUESTED: 'Return requested',
   PICKED_UP: 'Picked up',
   REFUNDED: 'Refunded',
@@ -17,7 +18,12 @@ export const STATUS_LABEL: Record<OrderStatus, string> = {
 
 const FORWARD: OrderStatus[] = ['CONFIRMED', 'PACKED', 'SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED'];
 const RETURN: OrderStatus[] = ['RETURN_REQUESTED', 'PICKED_UP', 'REFUNDED'];
-const BRANCH: OrderStatus[] = ['CANCELLED', 'PAYMENT_FAILED', 'PENDING_PAYMENT'];
+const BRANCH: OrderStatus[] = [
+  'CANCELLED',
+  'CANCELLED_NO_STOCK',
+  'PAYMENT_FAILED',
+  'PENDING_PAYMENT',
+];
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString('en-IN', {

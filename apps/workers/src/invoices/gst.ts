@@ -1,17 +1,21 @@
-import type { EventShipment, PostalAddress } from '../orders/order-events';
+import type { OrderConfirmedPayload } from '@shopsphere/types';
 
 /**
- * GST maths for a tax invoice. Selling prices are GST-inclusive, so the taxable value is backed
- * out per line: taxable = round(gross * 100 / (100 + rate)). Intra-state supply splits the tax
- * into CGST + SGST (half each); inter-state supply charges IGST.
+ * Invoice lines from the order module's per-line GST split (LineTax: taxable value after coupon,
+ * CGST+SGST intra-state or IGST inter-state). The worker never recomputes tax, so the invoice
+ * always matches what checkout charged.
  */
+
+type Shipment = OrderConfirmedPayload['shipments'][number];
 
 export interface InvoiceLine {
   description: string;
-  hsn: string;
   qty: number;
+  /** Percent, e.g. 18. */
   rate: number;
+  /** Net of coupon discount, GST-inclusive. */
   gross: number;
+  discount: number;
   taxable: number;
   cgst: number;
   sgst: number;
@@ -26,35 +30,18 @@ export interface InvoiceTotals {
   gross: number;
 }
 
-/** Shipping is a service (SAC 996812) taxed at 18 %. */
-export const SHIPPING_SAC = '996812';
-const SHIPPING_RATE = 18;
-
-function line(
-  description: string,
-  hsn: string,
-  qty: number,
-  rate: number,
-  gross: number,
-  intraState: boolean,
-): InvoiceLine {
-  const taxable = Math.round((gross * 100) / (100 + rate));
-  const tax = gross - taxable;
-  const cgst = intraState ? Math.floor(tax / 2) : 0;
-  const sgst = intraState ? tax - cgst : 0;
-  return { description, hsn, qty, rate, gross, taxable, cgst, sgst, igst: intraState ? 0 : tax };
-}
-
-export function invoiceLines(shipment: EventShipment, shipTo: PostalAddress): InvoiceLine[] {
-  const intra = shipment.seller.address.stateCode === shipTo.stateCode;
-  const lines = shipment.items.map((i) =>
-    line(i.title, i.hsn, i.qty, i.gstRate, i.unitPrice * i.qty, intra),
-  );
-  if (shipment.shippingFee > 0)
-    lines.push(
-      line('Shipping charges', SHIPPING_SAC, 1, SHIPPING_RATE, shipment.shippingFee, intra),
-    );
-  return lines;
+export function invoiceLines(shipment: Shipment): InvoiceLine[] {
+  return shipment.items.map((i) => ({
+    description: i.title,
+    qty: i.qty,
+    rate: i.tax.rateBp / 100,
+    gross: i.lineTotalPaise - i.discountPaise,
+    discount: i.discountPaise,
+    taxable: i.tax.taxablePaise,
+    cgst: i.tax.cgstPaise,
+    sgst: i.tax.sgstPaise,
+    igst: i.tax.igstPaise,
+  }));
 }
 
 export function totals(lines: InvoiceLine[]): InvoiceTotals {

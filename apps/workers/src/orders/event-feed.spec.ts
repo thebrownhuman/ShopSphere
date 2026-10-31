@@ -2,7 +2,12 @@ import { runFeedOnce } from './event-feed';
 import type { OrderEventEnvelope } from './order-events';
 
 const ev = (id: string) =>
-  ({ id, type: 'order.shipped', occurredAt: '', payload: {} }) as unknown as OrderEventEnvelope;
+  ({
+    id,
+    type: 'order.status_changed',
+    occurredAt: '',
+    payload: {},
+  }) as unknown as OrderEventEnvelope;
 
 describe('order event feed', () => {
   const realFetch = global.fetch;

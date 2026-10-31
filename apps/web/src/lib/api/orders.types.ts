@@ -12,6 +12,7 @@ export type OrderStatus =
   | 'OUT_FOR_DELIVERY'
   | 'DELIVERED'
   | 'CANCELLED'
+  | 'CANCELLED_NO_STOCK'
   | 'RETURN_REQUESTED'
   | 'PICKED_UP'
   | 'REFUNDED';

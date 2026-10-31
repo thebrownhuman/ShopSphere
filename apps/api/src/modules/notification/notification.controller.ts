@@ -7,28 +7,22 @@ import { SkipRateLimit } from '../shared/rate-limit/rate-limit.decorator';
 import { NotificationInternalGuard } from './notification.config';
 import { NotificationService } from './notification.service';
 import { preferencesPatchSchema, PreferencesStore } from './preferences';
-import type { NotificationEvent } from './templates';
+import { NOTIFIED_TYPES, type NotificationEvent } from './templates';
 
-const TYPES = [
-  'order.confirmed',
-  'payment.failed',
-  'order.shipped',
-  'order.delivered',
-  'order.cancelled',
-] as const;
+const TYPES = NOTIFIED_TYPES;
 
-const recipient = z.object({
-  userId: z.string().min(1),
-  name: z.string(),
-  email: z.string().email().nullable(),
-  phone: z.string().nullable(),
-});
-
-/** Envelope check only; templates read the documented payload fields. */
+/** Envelope check only; templates read OrderEventPayloads fields. */
 const eventSchema = z.object({
   id: z.string().min(1),
   type: z.enum(TYPES),
-  payload: z.object({ orderId: z.string(), orderNumber: z.string(), recipient }).passthrough(),
+  payload: z
+    .object({
+      orderId: z.string(),
+      orderNumber: z.string(),
+      userId: z.string(),
+      status: z.string(),
+    })
+    .passthrough(),
 });
 
 function parse<T>(schema: z.ZodType<T>, body: unknown): T {

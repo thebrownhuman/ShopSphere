@@ -3,6 +3,7 @@ import { ProcessedEventsService } from '../shared/events/processed-events.servic
 import { PrismaService } from '../shared/prisma/prisma.service';
 import { NOTIFICATION_CHANNELS, type NotificationChannels } from './channels';
 import { NOTIFICATION_CONFIG, type NotificationConfig } from './notification.config';
+import { NOTIFICATION_DIRECTORY, type NotificationDirectory } from './directory';
 import { PreferencesStore } from './preferences';
 import { renderNotification, type NotificationEvent } from './templates';
 
@@ -37,20 +38,26 @@ export class NotificationService {
     private readonly prefs: PreferencesStore,
     private readonly processed: ProcessedEventsService,
     private readonly prisma: PrismaService,
+    @Inject(NOTIFICATION_DIRECTORY) private readonly directory: NotificationDirectory,
   ) {}
 
   async dispatch(event: NotificationEvent): Promise<DispatchResult> {
     const sent: string[] = [];
     const processed = await this.processed.runOnce(CONSUMER, event.id, async () => {
-      const msg = renderNotification(event, this.cfg.WEB_URL);
-      const { recipient } = event.payload;
-      const prefs = (await this.prefs.get(recipient.userId))[msg.category];
-      if (recipient.email && (prefs.email || msg.emailMandatory)) {
-        await this.channels.email(recipient.email, msg.email.subject, msg.email.text);
+      const { userId, orderId } = event.payload;
+      const [to, ctx] = await Promise.all([
+        this.directory.recipient(userId),
+        this.directory.order(userId, orderId),
+      ]);
+      const msg = renderNotification(event, to, ctx, this.cfg.WEB_URL);
+      if (!msg) return;
+      const prefs = (await this.prefs.get(userId))[msg.category];
+      if (to.email && (prefs.email || msg.emailMandatory)) {
+        await this.channels.email(to.email, msg.email.subject, msg.email.text);
         sent.push('email');
       }
-      if (recipient.phone && prefs.sms) {
-        await this.channels.sms(recipient.phone, msg.sms);
+      if (to.phone && prefs.sms) {
+        await this.channels.sms(to.phone, msg.sms);
         sent.push('sms');
       }
     });

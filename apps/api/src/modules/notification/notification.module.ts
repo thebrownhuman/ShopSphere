@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { IdentityModule } from '../identity/identity.module';
+import { OrderModule } from '../order/order.module';
 import { MailpitChannels, NOTIFICATION_CHANNELS } from './channels';
+import { NOTIFICATION_DIRECTORY, PrismaNotificationDirectory } from './directory';
 import {
   NotificationInternalController,
   NotificationPreferencesController,
@@ -18,11 +20,12 @@ import { PreferencesStore } from './preferences';
  * per-shopper preferences. Workers pull the event feed and post each event to /dispatch.
  */
 @Module({
-  imports: [IdentityModule],
+  imports: [IdentityModule, OrderModule],
   controllers: [NotificationInternalController, NotificationPreferencesController],
   providers: [
     { provide: NOTIFICATION_CONFIG, useFactory: () => loadNotificationConfig(process.env) },
     { provide: NOTIFICATION_CHANNELS, useClass: MailpitChannels },
+    { provide: NOTIFICATION_DIRECTORY, useClass: PrismaNotificationDirectory },
     NotificationInternalGuard,
     NotificationService,
     PreferencesStore,

@@ -19,49 +19,97 @@ class HashRedis {
   }
 }
 
-const recipient = {
+const to = { name: 'Asha Verma', email: 'asha@example.test', phone: '+919876543210' };
+const ctx = { itemTitles: ['Redmi Note 13 5G', 'Case'], deliveryDate: '2026-11-04' };
+const base = {
+  orderId: 'ord-1',
+  orderNumber: 'OD200001',
   userId: 'u1',
-  name: 'Asha Verma',
-  email: 'asha@example.test',
-  phone: '+919876543210',
+  occurredAt: '2026-10-31T10:00:00.000Z',
 };
-const base = { orderId: 'ord-1', orderNumber: 'OD200001', recipient };
+const tax = { rateBp: 1800, taxablePaise: 0, cgstPaise: 0, sgstPaise: 0, igstPaise: 0 };
+const item = (title: string, qty: number) => ({
+  orderItemId: title,
+  skuId: title,
+  title,
+  qty,
+  unitPricePaise: 100,
+  lineTotalPaise: 100 * qty,
+  discountPaise: 0,
+  tax,
+});
 
 const confirmed: NotificationEvent = {
   id: 'evt-1',
   type: 'order.confirmed',
   payload: {
     ...base,
-    total: 1_839_800,
-    paymentMethod: 'BANK',
+    status: 'CONFIRMED',
+    paymentMethod: 'ONLINE',
+    totalPaise: 1_839_800,
+    payablePaise: 1_839_800,
+    lateCapture: false,
     shipments: [
-      { items: [{ title: 'Redmi Note 13 5G', qty: 1 }], deliveryDate: '2026-11-04' },
-      { items: [{ title: 'Milton Flask', qty: 2 }], deliveryDate: '2026-11-05' },
+      {
+        shipmentId: 's1',
+        sellerId: 'x',
+        sellerName: 'A',
+        sellerState: 'Karnataka',
+        shipToState: 'Karnataka',
+        promisedDate: '2026-11-04',
+        items: [item('Redmi Note 13 5G', 1)],
+      },
+      {
+        shipmentId: 's2',
+        sellerId: 'y',
+        sellerName: 'B',
+        sellerState: 'Maharashtra',
+        shipToState: 'Karnataka',
+        promisedDate: '2026-11-05',
+        items: [item('Milton Flask', 2)],
+      },
     ],
   },
 };
 const failed: NotificationEvent = {
   id: 'evt-2',
-  type: 'payment.failed',
-  payload: { ...base, amount: 1_839_800, reason: 'Card declined' },
+  type: 'order.payment_failed',
+  payload: {
+    ...base,
+    status: 'PENDING_PAYMENT',
+    reason: 'Card declined',
+    provider: 'bank',
+    retryUntil: '2026-10-31T10:15:00.000Z',
+  },
 };
 const shipped: NotificationEvent = {
   id: 'evt-3',
-  type: 'order.shipped',
-  payload: {
-    ...base,
-    itemTitles: ['Redmi Note 13 5G', 'Case'],
-    trackingId: 'SSX123',
-    carrier: 'ShopSphere Logistics',
-    deliveryDate: '2026-11-04',
-  },
+  type: 'order.status_changed',
+  payload: { ...base, status: 'SHIPPED', fromStatus: 'PACKED' },
 };
 const delivered: NotificationEvent = {
   id: 'evt-4',
-  type: 'order.delivered',
-  payload: { ...base, itemTitles: ['Redmi Note 13 5G'] },
+  type: 'order.status_changed',
+  payload: { ...base, status: 'DELIVERED', fromStatus: 'SHIPPED' },
+};
+const packed: NotificationEvent = {
+  id: 'evt-5',
+  type: 'order.status_changed',
+  payload: { ...base, status: 'PACKED', fromStatus: 'CONFIRMED' },
+};
+const noStock: NotificationEvent = {
+  id: 'evt-6',
+  type: 'order.cancelled',
+  payload: {
+    ...base,
+    status: 'CANCELLED_NO_STOCK',
+    reason: 'late capture',
+    cancelledBy: 'system',
+    refunds: [{ destination: 'GATEWAY', amountPaise: 1_839_800 }],
+  },
 };
 const WEB = 'http://localhost:3000';
+const render = (e: NotificationEvent) => renderNotification(e, to, ctx, WEB)!;
 
 describe('templates', () => {
   it('formats rupees Indian-style', () => {
@@ -69,18 +117,19 @@ describe('templates', () => {
     expect(inr(12_345_650)).toBe('₹1,23,456.50');
   });
 
-  it.each([confirmed, failed, shipped, delivered])('$type: email + SMS under 160 chars', (e) => {
-    const r = renderNotification(e, WEB);
-    expect(r.email.subject).toContain(
-      e.type === 'order.shipped' || e.type === 'order.delivered' ? 'Redmi' : 'OD200001',
-    );
-    expect(r.email.text).toContain(`${WEB}/orders/ord-1`);
-    expect(r.email.text.startsWith('Hi Asha,')).toBe(true);
-    expect(r.sms.length).toBeLessThanOrEqual(160);
-  });
+  it.each([confirmed, failed, shipped, delivered, noStock])(
+    '$id: email + SMS under 160 chars',
+    (e) => {
+      const r = render(e);
+      expect(r.email.subject).toContain(e.type === 'order.status_changed' ? 'Redmi' : 'OD200001');
+      expect(r.email.text).toContain(`${WEB}/orders/ord-1`);
+      expect(r.email.text.startsWith('Hi Asha,')).toBe(true);
+      expect(r.sms.length).toBeLessThanOrEqual(160);
+    },
+  );
 
   it('order placed lists items, total and the latest delivery date', () => {
-    const r = renderNotification(confirmed, WEB);
+    const r = render(confirmed);
     expect(r.category).toBe('ORDER_UPDATES');
     expect(r.emailMandatory).toBe(true);
     expect(r.email.text).toContain('Milton Flask × 2');
@@ -90,23 +139,27 @@ describe('templates', () => {
   });
 
   it('payment failed is a payment alert with the reason and retry window', () => {
-    const r = renderNotification(failed, WEB);
+    const r = render(failed);
     expect(r.category).toBe('PAYMENT_ALERTS');
     expect(r.email.text).toContain('(Card declined)');
-    expect(r.sms).toContain('Retry within 15 min');
+    expect(r.sms).toContain('Retry soon');
   });
 
-  it('shipped mentions carrier tracking', () => {
-    expect(renderNotification(shipped, WEB).email.text).toContain(
-      'ShopSphere Logistics tracking ID SSX123',
-    );
-    expect(renderNotification(shipped, WEB).email.subject).toBe(
-      'Shipped: Redmi Note 13 5G and 1 more',
-    );
+  it('shipped/delivered come from status_changed; other transitions send nothing', () => {
+    expect(render(shipped).email.subject).toBe('Shipped: Redmi Note 13 5G and 1 more');
+    expect(render(delivered).email.subject).toBe('Delivered: Redmi Note 13 5G and 1 more');
+    expect(renderNotification(packed, to, ctx, WEB)).toBeNull();
+  });
+
+  it('late capture with no stock sends a mandatory apology with the refund', () => {
+    const r = render(noStock);
+    expect(r.emailMandatory).toBe(true);
+    expect(r.email.subject).toContain('Sorry');
+    expect(r.email.text).toContain('refund of ₹18,398');
   });
 });
 
-function setup() {
+function setup(phoneless = false) {
   const sent: string[] = [];
   const channels: NotificationChannels = {
     email: async (to, subject) => void sent.push(`email:${to}:${subject}`),
@@ -122,12 +175,17 @@ function setup() {
     },
   } as unknown as ProcessedEventsService;
   const prefs = new PreferencesStore(new HashRedis() as unknown as Redis);
+  const directory = {
+    recipient: async () => ({ ...to, phone: phoneless ? null : to.phone }),
+    order: async () => ctx,
+  };
   const service = new NotificationService(
     channels,
     loadNotificationConfig({}),
     prefs,
     processed,
     {} as PrismaService,
+    directory,
   );
   return { service, sent, prefs };
 }
@@ -154,13 +212,13 @@ describe('NotificationService.dispatch', () => {
   });
 
   it('skips channels the recipient has no address for', async () => {
+    const { service } = setup(true);
+    expect((await service.dispatch(delivered)).sent).toEqual(['email']);
+  });
+
+  it('sends nothing for transitions without a template', async () => {
     const { service } = setup();
-    const noPhone = {
-      ...delivered,
-      id: 'evt-9',
-      payload: { ...delivered.payload, recipient: { ...recipient, phone: null } },
-    } as NotificationEvent;
-    expect((await service.dispatch(noPhone)).sent).toEqual(['email']);
+    expect(await service.dispatch(packed)).toEqual({ processed: true, sent: [] });
   });
 
   it('propagates send failures so the worker retries', async () => {
