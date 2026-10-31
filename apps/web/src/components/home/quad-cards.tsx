@@ -27,17 +27,24 @@ export function QuadCards({ cards }: { cards: QuadCard[] }) {
               {card.tiles.slice(0, 4).map((t) => (
                 <li key={t.href + t.label}>
                   <Link href={t.href} className="group block text-xs">
-                    <CatalogImage
-                      image={{ ...t.image, alt: '' }}
-                      sizes="(min-width:1024px) 10vw, 40vw"
-                      className="aspect-square w-full bg-slate-100 object-cover"
-                    />
+                    {t.image ? (
+                      <CatalogImage
+                        image={{ ...t.image, alt: '' }}
+                        sizes="(min-width:1024px) 10vw, 40vw"
+                        className="aspect-square w-full bg-slate-100 object-cover"
+                      />
+                    ) : (
+                      <span
+                        aria-hidden="true"
+                        className="block aspect-square w-full bg-slate-100"
+                      />
+                    )}
                     <span className="mt-1 block truncate group-hover:underline">{t.label}</span>
                   </Link>
                 </li>
               ))}
             </ul>
-          ) : (
+          ) : card.cta ? (
             <div className="flex flex-1 flex-col justify-center gap-3">
               <p className="text-sm text-slate-700">
                 See personalised recommendations, track orders and reorder in a click.
@@ -49,8 +56,8 @@ export function QuadCards({ cards }: { cards: QuadCard[] }) {
                 {card.cta.label}
               </Link>
             </div>
-          )}
-          {card.tiles.length > 0 && (
+          ) : null}
+          {card.tiles.length > 0 && card.cta && (
             <Link href={card.cta.href} className="mt-3 text-sm text-brand-dark hover:underline">
               {card.cta.label}
               <span className="sr-only">: {card.title}</span>

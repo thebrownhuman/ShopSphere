@@ -1,5 +1,23 @@
 import { API_URL, ApiRequestError } from '../api';
-import { serializeSearchQuery } from '../search-params';
+import type {
+  CategoriesResponse,
+  DeliveryEstimateResponse,
+  HomeResponse as ApiHomeResponse,
+  ProductDetailResponse,
+  ProductOffersResponse,
+  SearchResponse,
+  SuggestResponse,
+} from '@shopsphere/types';
+import {
+  toCategories,
+  toDelivery,
+  toHome,
+  toOffers,
+  toProduct,
+  toSearchParams,
+  toSearchResult,
+  toSuggestions,
+} from './catalog.adapters';
 import type {
   CategoryNode,
   DeliveryEstimate,
@@ -13,7 +31,8 @@ import type {
 
 /**
  * Single entry point for catalog/search data. Pages and components never call fetch directly,
- * so the mock (NEXT_PUBLIC_CATALOG_MOCK=1) and the real API are interchangeable.
+ * so the mock (NEXT_PUBLIC_CATALOG_MOCK=1) and the real API are interchangeable. Backend DTOs are
+ * mapped to the web view types in catalog.adapters.ts.
  *
  * Caching (plan M2.22): descriptive content is ISR-cached for 5 minutes; price, stock and delivery
  * (offers + delivery estimate) are always fetched with `no-store` and only ever on the client.
@@ -40,23 +59,26 @@ const mock = () => import('./catalog.mock');
 
 export async function getHome(): Promise<HomeResponse> {
   if (CATALOG_MOCK) return (await mock()).getHome();
-  return (await get<HomeResponse>('/home')) ?? { sections: [] };
+  const res = await get<ApiHomeResponse>('/home');
+  return res ? toHome(res, API_URL) : { sections: [] };
 }
 
 export async function getCategories(): Promise<CategoryNode[]> {
   if (CATALOG_MOCK) return (await mock()).getCategories();
-  return (await get<CategoryNode[]>('/categories')) ?? [];
+  const res = await get<CategoriesResponse>('/categories');
+  return res ? toCategories(res.categories, API_URL) : [];
 }
 
 export async function getProduct(slug: string): Promise<ProductDetail | null> {
   if (CATALOG_MOCK) return (await mock()).getProduct(slug);
-  return get<ProductDetail>(`/products/${encodeURIComponent(slug)}`);
+  const res = await get<ProductDetailResponse>(`/products/${encodeURIComponent(slug)}`);
+  return res ? toProduct(res, API_URL) : null;
 }
 
-/** Slugs for sitemap.xml. */
+/** Slugs for sitemap.xml. The API has no listing endpoint yet, so this is empty outside the mock. */
 export async function listProductSlugs(): Promise<Array<{ slug: string; updatedAt: string }>> {
   if (CATALOG_MOCK) return (await mock()).listProductSlugs();
-  return (await get<Array<{ slug: string; updatedAt: string }>>('/products/slugs')) ?? [];
+  return [];
 }
 
 export async function getOffers(
@@ -65,11 +87,11 @@ export async function getOffers(
   opts: { signal?: AbortSignal } = {},
 ): Promise<OffersResponse> {
   if (CATALOG_MOCK) return (await mock()).getOffers(productId, skuId);
-  const res = await get<OffersResponse>(
+  const res = await get<ProductOffersResponse>(
     `/products/${encodeURIComponent(productId)}/offers?sku=${encodeURIComponent(skuId)}`,
     { live: true, ...opts },
   );
-  return res ?? { productId, skuId, buyBox: null, others: [], bankOffers: [] };
+  return res ? toOffers(res) : { productId, skuId, buyBox: null, others: [], bankOffers: [] };
 }
 
 export async function getDeliveryEstimate(
@@ -79,17 +101,18 @@ export async function getDeliveryEstimate(
 ): Promise<DeliveryEstimate | null> {
   if (CATALOG_MOCK) return (await mock()).getDeliveryEstimate(skuId, pincode);
   const qs = new URLSearchParams({ sku: skuId, pincode });
-  return get<DeliveryEstimate>(`/delivery-estimate?${qs}`, { live: true, ...opts });
+  const res = await get<DeliveryEstimateResponse>(`/delivery-estimate?${qs}`, {
+    live: true,
+    ...opts,
+  });
+  return res ? toDelivery(res) : null;
 }
 
 export async function search(query: SearchQuery): Promise<SearchResult> {
   if (CATALOG_MOCK) return (await mock()).search(query);
-  // The API takes the same filter vocabulary as the site URL, except `k` -> `q`.
-  const qs = new URLSearchParams(serializeSearchQuery(query));
-  const k = qs.get('k');
-  qs.delete('k');
-  if (k) qs.set('q', k);
-  return (await get<SearchResult>(`/search?${qs}`, { live: true }))!;
+  const res = await get<SearchResponse>(`/search?${toSearchParams(query)}`, { live: true });
+  if (!res) throw new ApiRequestError(404, null);
+  return toSearchResult(res, API_URL);
 }
 
 export async function suggest(
@@ -97,10 +120,9 @@ export async function suggest(
   opts: { signal?: AbortSignal } = {},
 ): Promise<Suggestion[]> {
   if (CATALOG_MOCK) return (await mock()).suggest(prefix);
-  return (
-    (await get<Suggestion[]>(`/search/suggest?q=${encodeURIComponent(prefix)}`, {
-      live: true,
-      ...opts,
-    })) ?? []
-  );
+  const res = await get<SuggestResponse>(`/search/suggest?q=${encodeURIComponent(prefix)}`, {
+    live: true,
+    ...opts,
+  });
+  return res ? toSuggestions(res) : [];
 }

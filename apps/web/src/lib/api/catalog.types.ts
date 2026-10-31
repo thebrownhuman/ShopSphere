@@ -35,13 +35,14 @@ export interface ProductSummary {
   image: ImageRef;
   rating: number;
   ratingCount: number;
+  /** 0 when there is no live offer (the tile then hides the price). */
   price: number;
   mrp: number;
   /** "Fulfilled by ShopSphere" fast delivery (PRD "Plus" badge). */
   plus: boolean;
   inStock: boolean;
-  /** Fastest delivery in days from today for the default pincode, from the index. */
-  deliveryDays: number;
+  /** Fastest delivery in days from today, when the source knows it (the API card does not). */
+  deliveryDays?: number;
   sponsored?: boolean;
 }
 
@@ -58,8 +59,8 @@ export interface Banner {
 export interface QuadCard {
   id: string;
   title: string;
-  tiles: Array<{ label: string; href: string; image: ImageRef }>;
-  cta: { label: string; href: string };
+  tiles: Array<{ label: string; href: string; image?: ImageRef }>;
+  cta: { label: string; href: string } | null;
   /** `guest` cards only render for signed-out shoppers. */
   audience: 'all' | 'guest' | 'signed-in';
 }
@@ -73,7 +74,13 @@ export type HomeSection =
   | { id: string; type: 'quad'; cards: QuadCard[] }
   | { id: string; type: 'deals'; title: string; endsAt: string; href: string; items: DealItem[] }
   | { id: string; type: 'carousel'; title: string; href?: string; items: ProductSummary[] }
-  | { id: string; type: 'recently-viewed'; title: string };
+  | { id: string; type: 'recently-viewed'; title: string }
+  | {
+      id: string;
+      type: 'category-tiles';
+      title: string;
+      categories: Array<{ slug: string; name: string; image?: ImageRef }>;
+    };
 
 export interface HomeResponse {
   sections: HomeSection[];

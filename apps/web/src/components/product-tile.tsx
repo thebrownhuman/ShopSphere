@@ -48,7 +48,7 @@ export function ProductTile({
         <RatingStars rating={p.rating} count={p.ratingCount} />
       </div>
       <div className="mt-1">
-        <Price price={p.price} mrp={p.mrp} size={compact ? 'sm' : 'md'} />
+        {p.price > 0 && <Price price={p.price} mrp={p.mrp} size={compact ? 'sm' : 'md'} />}
       </div>
       {!compact && (
         <div className="mt-1 space-y-0.5 text-xs text-slate-700">
@@ -57,13 +57,13 @@ export function ProductTile({
               ✓ Plus
             </Badge>
           )}
-          {p.inStock ? (
+          {!p.inStock ? (
+            <p className="font-medium text-deal">Currently unavailable</p>
+          ) : p.deliveryDays !== undefined ? (
             <p>
               FREE delivery <span className="font-semibold">{deliveryLabel(p.deliveryDays)}</span>
             </p>
-          ) : (
-            <p className="font-medium text-deal">Currently unavailable</p>
-          )}
+          ) : null}
         </div>
       )}
     </article>

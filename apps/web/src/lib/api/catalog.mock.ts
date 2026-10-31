@@ -931,7 +931,7 @@ function applyFilters(rows: Row[], q: SearchQuery, skip?: string): Row[] {
     if (skip !== 'discount' && q.discount && (s.mrp - s.price) / s.mrp < q.discount / 100)
       return false;
     if (skip !== 'delivery' && q.delivery === 'plus' && !s.plus) return false;
-    if (skip !== 'delivery' && q.delivery === 'tomorrow' && s.deliveryDays > 1) return false;
+    if (skip !== 'delivery' && q.delivery === 'tomorrow' && (s.deliveryDays ?? 9) > 1) return false;
     if (q.inStock && !s.inStock) return false;
     for (const [k, vals] of Object.entries(q.attrs)) {
       if (skip === k || !vals.length) continue;
@@ -1048,7 +1048,7 @@ export async function search(q: SearchQuery): Promise<SearchResult> {
     ),
     terms('delivery', 'Delivery', applyFilters(base, q, 'delivery'), ({ s }) => [
       ...(s.plus ? ([['plus', 'ShopSphere Plus']] as Array<[string, string]>) : []),
-      ...(s.deliveryDays <= 1
+      ...((s.deliveryDays ?? 9) <= 1
         ? ([['tomorrow', 'Get it by tomorrow']] as Array<[string, string]>)
         : []),
     ]),
