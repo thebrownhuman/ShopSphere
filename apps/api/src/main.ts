@@ -8,6 +8,7 @@ async function bootstrap() {
   const config = app.get(AppConfig);
   app.enableCors({
     origin: config.get('CORS_ORIGINS').split(','),
+    credentials: true,
     exposedHeaders: ['x-request-id'],
   });
   app.enableShutdownHooks();

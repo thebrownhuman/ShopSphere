@@ -52,3 +52,137 @@ model ProcessedEvent {
   @@id([consumer, eventId])
   @@map("processed_events")
 }
+
+// ───────────────────────── Identity (M1) ─────────────────────────
+
+/// Customer account. Login identifiers live in user_identities.
+model User {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String?
+  passwordHash    String?   @map("password_hash")
+  totpSecret      String?   @map("totp_secret")
+  totpEnabled     Boolean   @default(false) @map("totp_enabled")
+  status          String    @default("active")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  identities    UserIdentity[]
+  sessions      Session[]
+  addresses     Address[]
+  knownDevices  KnownDevice[]
+
+  @@map("users")
+}
+
+/// One login identifier per row: type = email | phone | google. value is normalised (lowercased email, E.164 phone, google sub).
+model UserIdentity {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  type       String
+  value      String
+  verifiedAt DateTime? @map("verified_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([type, value], map: "uq_user_identities_type_value")
+  @@index([userId], map: "idx_user_identities_user_id")
+  @@map("user_identities")
+}
+
+/// A login session = one refresh-token family. Revoking it kills every token in the family.
+model Session {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  persistent  Boolean   @default(false)
+  userAgent   String?   @map("user_agent")
+  ip          String?
+  deviceId    String?   @map("device_id")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastUsedAt  DateTime  @default(now()) @map("last_used_at") @db.Timestamptz(6)
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz(6)
+  revokedReason String? @map("revoked_reason")
+  /// Last step-up re-auth (password/OTP/TOTP) for sensitive changes.
+  reauthAt    DateTime? @map("reauth_at") @db.Timestamptz(6)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokens RefreshToken[]
+
+  @@index([userId], map: "idx_sessions_user_id")
+  @@map("sessions")
+}
+
+/// Rotating refresh tokens. Only the SHA-256 of the token is stored.
+model RefreshToken {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId  String    @map("session_id") @db.Uuid
+  tokenHash  String    @unique(map: "uq_refresh_tokens_token_hash") @map("token_hash")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt     DateTime? @map("used_at") @db.Timestamptz(6)
+  session    Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId], map: "idx_refresh_tokens_session_id")
+  @@map("refresh_tokens")
+}
+
+/// Audit trail of OTP challenges. Live code/attempt state is in Redis (5-min TTL).
+model OtpChallenge {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  channel     String
+  target      String
+  purpose     String
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(6)
+  verifiedAt  DateTime? @map("verified_at") @db.Timestamptz(6)
+  attempts    Int       @default(0)
+
+  @@index([target, createdAt], map: "idx_otp_challenges_target")
+  @@map("otp_challenges")
+}
+
+/// Devices that have logged in before; unknown device → new-device alert.
+model KnownDevice {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  deviceId    String   @map("device_id")
+  userAgent   String?  @map("user_agent")
+  firstSeenAt DateTime @default(now()) @map("first_seen_at") @db.Timestamptz(6)
+  lastSeenAt  DateTime @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceId], map: "uq_known_devices_user_device")
+  @@map("known_devices")
+}
+
+model Address {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  name        String
+  phone       String
+  line1       String
+  line2       String?
+  landmark    String?
+  city        String
+  state       String
+  pincode     String
+  type        String    @default("home")
+  isDefault   Boolean   @default(false) @map("is_default")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_addresses_user_id")
+  @@map("addresses")
+}
+
+/// Pincode directory for city/state autofill and serviceability.
+model Pincode {
+  pincode     String  @id
+  city        String
+  state       String
+  serviceable Boolean @default(true)
+
+  @@map("pincodes")
+}
