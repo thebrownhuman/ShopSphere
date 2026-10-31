@@ -2,10 +2,13 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { CartModule } from './modules/cart/cart.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
+import { CheckoutModule } from './modules/checkout/checkout.module';
 import { HealthModule } from './modules/health/health.module';
 import { HomeModule } from './modules/home/home.module';
 import { IdentityModule } from './modules/identity/identity.module';
 import { NotificationModule } from './modules/notification/notification.module';
+import { LedgerModule } from './modules/ledger/ledger.module';
+import { OrderModule } from './modules/order/order.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { GlobalExceptionFilter } from './modules/shared/errors/global-exception.filter';
 import { IdempotencyInterceptor } from './modules/shared/idempotency/idempotency.interceptor';
@@ -25,6 +28,9 @@ import { SharedModule } from './modules/shared/shared.module';
     HomeModule,
     CartModule,
     NotificationModule,
+    LedgerModule,
+    OrderModule,
+    CheckoutModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },

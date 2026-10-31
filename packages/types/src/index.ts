@@ -92,3 +92,8 @@ export * from './catalog';
 // ───────── Cart and wishlist (M3) ─────────
 
 export * from './cart';
+
+// ───────── Checkout and orders (M4) ─────────
+
+export * from './checkout';
+export * from './order';
