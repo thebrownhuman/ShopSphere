@@ -9,6 +9,8 @@ import { renderNotification, type NotificationEvent } from './templates';
 
 const CONSUMER = 'notification.order-events';
 const FEED_PAGE = 100;
+/** Cursor for an empty feed: the next call starts from the first event. */
+const FEED_START = 'start';
 
 export interface DispatchResult {
   /** False when the event was already processed (redelivery). */
@@ -79,12 +81,15 @@ export class NotificationService {
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         select: { id: true },
       });
-      return { events: [], cursor: latest?.id ?? null };
+      return { events: [], cursor: latest?.id ?? FEED_START };
     }
-    const from = await this.prisma.outboxEvent.findUnique({
-      where: { id: after },
-      select: { createdAt: true },
-    });
+    const from =
+      after === FEED_START
+        ? null
+        : await this.prisma.outboxEvent.findUnique({
+            where: { id: after },
+            select: { createdAt: true },
+          });
     const rows = await this.prisma.outboxEvent.findMany({
       where: {
         eventType: { in: types },
