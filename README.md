@@ -70,3 +70,21 @@ OpenAPI spec exists), M0.7 (no Docker image build yet), M0.11, M0.15.
 
 TODO: M0.6 design system components, M0.8 Terraform, M0.9 CD, M0.10 observability, M0.12 feature
 flags, M0.13 long-lead business items, M0.14 analytics pipeline, OpenAPI-generated client, Docker images in CI.
+
+## Payments (M4.10–M4.18 foundation, ahead of checkout)
+
+`apps/api/src/modules/payment` + `apps/bank-sim` (see its README for test cards and protocol).
+
+- Providers behind `PaymentProvider`: `bank` (ShopSphere Bank simulator, always on) and `razorpay`
+  (test mode; enabled only when `RAZORPAY_KEY_ID` (`rzp_test_…`), `RAZORPAY_KEY_SECRET` and
+  `RAZORPAY_WEBHOOK_SECRET` are set; point the Razorpay dashboard webhook at
+  `<public api url>/payments/webhooks/razorpay`, e.g. via a tunnel).
+- Routes: `POST /payments/:orderId/initiate` (Idempotency-Key), `POST /payments/:orderId/verify`,
+  `GET /payments/:orderId/status`, `POST /payments/webhooks/:provider`, internal (`x-internal-token`):
+  `POST /payments/:orderId/refunds`, `POST /payments/internal/reconcile`. Dev only: `POST /payments/dev/orders`.
+- Orders come from `PayableOrderSource`; `StubOrderSource` (in memory) stands in until the orders module.
+- Paid only on a verified webhook / reconciliation fetch; events stored once in `webhook_events`; first
+  capture wins (`order_payment_captures`), later captures auto-refunded; reconciliation runs from
+  `apps/workers` every 5 min.
+
+Try it: `pnpm --filter @shopsphere/bank-sim dev`, run the API and web, open http://localhost:3000/dev/pay.

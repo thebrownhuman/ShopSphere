@@ -43,7 +43,7 @@ describe('API (e2e, mocked infra)', () => {
       .overrideProvider(PrismaService)
       .useValue(prisma)
       .compile();
-    app = moduleRef.createNestApplication();
+    app = moduleRef.createNestApplication({ rawBody: true });
     await app.init();
   });
 
@@ -117,5 +117,42 @@ describe('API (e2e, mocked infra)', () => {
     redis.down = true;
     await request(app.getHttpServer()).post('/test/limited').expect(201);
     redis.down = false;
+  });
+});
+
+describe('Payment webhooks (e2e, mocked infra)', () => {
+  let app: INestApplication;
+
+  beforeAll(async () => {
+    process.env.DATABASE_URL = 'postgresql://u:p@localhost:5432/db';
+    process.env.REDIS_URL = 'redis://localhost:6379';
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(REDIS)
+      .useValue(new FakeRedis())
+      .overrideProvider(PrismaService)
+      .useValue({ $disconnect: jest.fn() })
+      .compile();
+    app = moduleRef.createNestApplication({ rawBody: true });
+    await app.init();
+  });
+
+  afterAll(() => app.close());
+
+  it('rejects a webhook with a bad signature before touching the database', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/payments/webhooks/bank')
+      .set('content-type', 'application/json')
+      .set('x-bank-signature', 'deadbeef')
+      .send(JSON.stringify({ event: 'payment.captured' }))
+      .expect(401);
+    expect(res.body.code).toBe('WEBHOOK_SIGNATURE_INVALID');
+  });
+
+  it('rejects an unknown provider', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/payments/webhooks/paypal')
+      .send({})
+      .expect(400);
+    expect(res.body.code).toBe('PROVIDER_UNAVAILABLE');
   });
 });

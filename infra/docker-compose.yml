@@ -48,6 +48,17 @@ services:
     ports: ['${S3_PORT:-8333}:8333']
     volumes: [s3data:/data]
 
+  # ShopSphere Bank: simulated card/netbanking/UPI gateway (Razorpay-compatible). Dev console at /dev.
+  bank-sim:
+    build:
+      context: ..
+      dockerfile: apps/bank-sim/Dockerfile
+    environment:
+      WEBHOOK_URL: ${BANK_WEBHOOK_URL:-http://host.docker.internal:4000/payments/webhooks/bank}
+      ALLOWED_CALLBACK_ORIGINS: ${BANK_ALLOWED_CALLBACK_ORIGINS:-http://localhost:3000}
+    extra_hosts: ['host.docker.internal:host-gateway']
+    ports: ['${BANK_SIM_PORT:-4100}:4100']
+
 volumes:
   pgdata:
   osdata:
