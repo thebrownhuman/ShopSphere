@@ -98,7 +98,9 @@ test('delivered order → write review → shows on the PDP with the updated rat
   await page.goto(`/p/${slug}`);
   await page.getByTestId('write-review').click();
   const form = page.getByRole('form', { name: 'Write a review' });
-  await form.getByLabel('1 star', { exact: true }).check({ force: true });
+  // The radio is visually hidden behind its star; click the star like a shopper would.
+  await form.locator('label', { has: page.getByLabel('1 star', { exact: true }) }).click();
+  await expect(form.getByLabel('1 star', { exact: true })).toBeChecked();
   await form.getByLabel('Headline').fill('Not for me');
   await form
     .getByLabel('Your review')
@@ -117,7 +119,10 @@ test('delivered order → write review → shows on the PDP with the updated rat
   await expect(page.getByTestId('review-rating')).toHaveText(`${after.rating.toFixed(1)} out of 5`);
   await expect(page.getByTestId('review-ineligible')).toHaveText(/you have reviewed/);
 
-  await reviews.getByRole('button', { name: '1 ★' }).click();
+  await page
+    .getByRole('group', { name: 'Filter reviews' })
+    .getByRole('button', { name: '1 ★' })
+    .click();
   const card = page.getByTestId('review-card').filter({ hasText: 'Not for me' });
   await expect(card).toContainText('Asha V.');
   await expect(card).toContainText('Verified Purchase');
