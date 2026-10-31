@@ -167,6 +167,14 @@ export class SellerAccountService {
         where: { id },
         data: { status: 'APPROVED', sellerId: seller, reviewedAt: new Date() },
       });
+      // Fulfilment (orders/shipments/payouts) authorises sellers through seller_users.
+      if (acc.userId) {
+        await tx.sellerUser.upsert({
+          where: { userId: acc.userId },
+          update: { sellerId: seller },
+          create: { userId: acc.userId, sellerId: seller, role: 'OWNER' },
+        });
+      }
       await this.audit.record(
         {
           actorType: 'admin',

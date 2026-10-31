@@ -1,9 +1,11 @@
 'use client';
 
 import { Button, Price, Skeleton, formatPrice } from '@shopsphere/ui';
+import { useRouter } from 'next/navigation';
 import { useEffect, useId, useState } from 'react';
 import { countdown, formatDeliveryDate } from '@/lib/delivery';
 import { AddToCartButton } from '../cart/add-to-cart-button';
+import { BUY_NOW_PREVIEW_KEY } from '@/lib/api/checkout';
 import { PincodeButton } from '../header/pincode-button';
 import { useDelivery, useOffers, usePdp } from './pdp-context';
 
@@ -33,13 +35,41 @@ function DeliveryPromise() {
   );
 }
 
-/** Buy Now and wishlist arrive with M4. */
+/** Wishlist button arrives later. */
 const notYet = () => {};
+
+/** M4.26: Buy Now skips the cart and opens a one-item checkout session. */
+function useBuyNow() {
+  const router = useRouter();
+  const { product } = usePdp();
+  return (offer: { skuId: string; sellerId: string; price: number; mrp?: number }, qty = 1) => {
+    try {
+      sessionStorage.setItem(
+        BUY_NOW_PREVIEW_KEY,
+        JSON.stringify({
+          title: product.title,
+          slug: product.slug,
+          price: offer.price,
+          mrp: offer.mrp,
+        }),
+      );
+    } catch {
+      // display hint only
+    }
+    const q = new URLSearchParams({
+      buyNow: offer.skuId,
+      seller: offer.sellerId,
+      qty: String(qty),
+    });
+    router.push(`/checkout?${q}`);
+  };
+}
 
 /** PRD §6 right column: sticky buy box; everything inside is fetched live (no-store). */
 export function BuyBox() {
   const { product } = usePdp();
   const { data, isLoading } = useOffers();
+  const buyNow = useBuyNow();
   const qtyId = useId();
   const [qty, setQty] = useState(1);
   const offer = data?.buyBox;
@@ -93,7 +123,7 @@ export function BuyBox() {
             qty={qty}
             price={offer.price}
           />
-          <Button block variant="buy" onClick={notYet} data-testid="buy-now">
+          <Button block variant="buy" onClick={() => buyNow(offer, qty)} data-testid="buy-now">
             Buy Now
           </Button>
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs text-slate-700">
@@ -153,6 +183,7 @@ export function BuyBox() {
 /** Mobile sticky bottom bar (PRD §6 mobile web). */
 export function MobileBuyBar() {
   const { data } = useOffers();
+  const buyNow = useBuyNow();
   const offer = data?.buyBox;
   return (
     <div
@@ -171,7 +202,7 @@ export function MobileBuyBar() {
             data-testid="mobile-add-to-cart"
             errorClassName="absolute bottom-full mb-1 rounded bg-white px-2 py-1 shadow"
           />
-          <Button className="flex-1" variant="buy" onClick={notYet}>
+          <Button className="flex-1" variant="buy" onClick={() => buyNow(offer)}>
             Buy Now
           </Button>
         </>

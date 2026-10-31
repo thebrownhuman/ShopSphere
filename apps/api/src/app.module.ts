@@ -3,9 +3,11 @@ import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { CartModule } from './modules/cart/cart.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { CheckoutModule } from './modules/checkout/checkout.module';
+import { FulfilmentModule } from './modules/fulfilment/fulfilment.module';
 import { HealthModule } from './modules/health/health.module';
 import { HomeModule } from './modules/home/home.module';
 import { IdentityModule } from './modules/identity/identity.module';
+import { NotificationModule } from './modules/notification/notification.module';
 import { LedgerModule } from './modules/ledger/ledger.module';
 import { OrderModule } from './modules/order/order.module';
 import { PaymentModule } from './modules/payment/payment.module';
@@ -27,10 +29,12 @@ import { SharedModule } from './modules/shared/shared.module';
     SearchModule,
     HomeModule,
     CartModule,
+    NotificationModule,
     LedgerModule,
     OrderModule,
     CheckoutModule,
     SellerModule,
+    FulfilmentModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },

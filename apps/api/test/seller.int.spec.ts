@@ -193,6 +193,9 @@ describe('seller central (integration, real Postgres + OpenSearch)', () => {
     expect(approved.body.status).toBe('APPROVED');
     const seller = await prisma.seller.findUniqueOrThrow({ where: { id: approved.body.sellerId } });
     expect(seller).toMatchObject({ state: 'Karnataka', pincode: '560058', isFirstParty: false });
+    // Fulfilment routes (/seller/orders etc.) authorise through seller_users.
+    const link = await prisma.sellerUser.findFirstOrThrow({ where: { sellerId: seller.id } });
+    expect(link.role).toBe('OWNER');
   });
 
   it('lists a product with variants and images; it shows up in catalog search', async () => {

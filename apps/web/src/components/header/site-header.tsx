@@ -50,7 +50,7 @@ export function SiteHeader({ categories }: { categories: CategoryNode[] }) {
             </span>
             <AccountLink />
             <Link
-              href="/account"
+              href="/orders"
               className="hidden rounded px-2 py-1 text-sm hover:outline hover:outline-1 hover:outline-white lg:block"
             >
               <span className="block text-xs opacity-90">Returns</span>

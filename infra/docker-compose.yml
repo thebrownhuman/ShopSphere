@@ -59,6 +59,16 @@ services:
     extra_hosts: ['host.docker.internal:host-gateway']
     ports: ['${BANK_SIM_PORT:-4100}:4100']
 
+  courier-sim:
+    build:
+      context: ..
+      dockerfile: apps/courier-sim/Dockerfile
+    environment:
+      WEBHOOK_URL: ${COURIER_WEBHOOK_URL:-http://host.docker.internal:4000/shipping/webhooks/courier-sim}
+      STEP_MS: ${COURIER_STEP_MS:-30000}
+    extra_hosts: ['host.docker.internal:host-gateway']
+    ports: ['${COURIER_SIM_PORT:-4500}:4500']
+
 volumes:
   pgdata:
   osdata:

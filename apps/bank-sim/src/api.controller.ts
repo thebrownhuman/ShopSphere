@@ -87,6 +87,17 @@ export class MerchantApiController {
     return { entity: 'collection', count: items.length, items };
   }
 
+  @Post('payouts')
+  @HttpCode(200)
+  createPayout(@Body() body: Record<string, unknown>, @Headers('idempotency-key') key?: string) {
+    return this.bank.createPayout(body ?? {}, key);
+  }
+
+  @Get('payouts/:id')
+  payout(@Param('id') id: string) {
+    return this.bank.getPayout(id);
+  }
+
   @Get('payments/:id')
   payment(@Param('id') id: string) {
     return this.bank.getPayment(id);

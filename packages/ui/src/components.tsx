@@ -202,3 +202,46 @@ export function SectionCard({
     </section>
   );
 }
+
+export interface TimelineStep {
+  key: string;
+  label: ReactNode;
+  /** Secondary line, e.g. a timestamp. */
+  detail?: ReactNode;
+  state: 'done' | 'current' | 'upcoming' | 'stopped';
+}
+
+/** Vertical progress timeline (order tracking). State is shown by text as well as colour. */
+export function Timeline({ steps, label }: { steps: TimelineStep[]; label: string }) {
+  const dot: Record<TimelineStep['state'], string> = {
+    done: 'border-green-700 bg-green-700',
+    current: 'border-green-700 bg-white',
+    upcoming: 'border-slate-300 bg-white',
+    stopped: 'border-deal bg-deal',
+  };
+  const sr: Record<TimelineStep['state'], string> = {
+    done: 'completed',
+    current: 'in progress',
+    upcoming: 'pending',
+    stopped: 'stopped',
+  };
+  return (
+    <ol aria-label={label} className="relative space-y-4 border-l-2 border-slate-200 pl-5">
+      {steps.map((s) => (
+        <li key={s.key} className="relative" data-state={s.state}>
+          <span
+            aria-hidden="true"
+            className={cx(
+              'absolute -left-[27px] top-1 h-3 w-3 rounded-full border-2',
+              dot[s.state],
+            )}
+          />
+          <p className={cx('text-sm', s.state === 'upcoming' ? 'text-slate-500' : 'font-semibold')}>
+            {s.label} <span className="sr-only">({sr[s.state]})</span>
+          </p>
+          {s.detail && <p className="text-xs text-slate-600">{s.detail}</p>}
+        </li>
+      ))}
+    </ol>
+  );
+}

@@ -45,6 +45,12 @@ export function eventTypeFor(to: OrderStatus): string {
     case 'CANCELLED':
     case 'CANCELLED_NO_STOCK':
       return 'order.cancelled';
+    case 'SHIPPED':
+      return 'order.shipped';
+    case 'OUT_FOR_DELIVERY':
+      return 'order.out_for_delivery';
+    case 'DELIVERED':
+      return 'order.delivered';
     default:
       return 'order.status_changed';
   }
