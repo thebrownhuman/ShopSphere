@@ -97,3 +97,7 @@ export * from './cart';
 
 export * from './checkout';
 export * from './order';
+
+// ───────── Fulfilment, shipping, settlement (M5) ─────────
+
+export * from './fulfilment';
