@@ -193,6 +193,8 @@ describe('seller central (integration, real Postgres + OpenSearch)', () => {
     expect(approved.body.status).toBe('APPROVED');
     const seller = await prisma.seller.findUniqueOrThrow({ where: { id: approved.body.sellerId } });
     expect(seller).toMatchObject({ state: 'Karnataka', pincode: '560058', isFirstParty: false });
+    // Fulfilment routes (/seller/orders etc.) authorise through the approved seller account.
+    await http().get('/seller/orders').set('Authorization', auth).expect(200);
   });
 
   it('lists a product with variants and images; it shows up in catalog search', async () => {
@@ -357,13 +359,13 @@ describe('seller central (integration, real Postgres + OpenSearch)', () => {
     expect(xlsx.body.code).toBe('UPLOAD_INVALID');
   });
 
-  it('dashboard summarises listings, with no payout data yet', async () => {
+  it('dashboard summarises listings, including payout totals', async () => {
     const res = await http().get('/seller/dashboard').set('Authorization', auth).expect(200);
     expect(res.body).toMatchObject({
       sales: { last30DaysPaise: 0 },
       orders: { total: 0 },
       listings: { activeOffers: 4, outOfStock: 0 },
-      payouts: null,
+      payouts: { pendingPaise: 0, paidPaise: 0, lastPayoutAt: null },
     });
   });
 });

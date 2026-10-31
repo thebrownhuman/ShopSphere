@@ -109,7 +109,7 @@ export class InventoryService {
     const since = new Date(now.getTime() - 30 * 86_400_000);
     const dayStart = new Date(now);
     dayStart.setUTCHours(0, 0, 0, 0);
-    const [daily, byStatus, listings] = await Promise.all([
+    const [daily, byStatus, listings, payouts] = await Promise.all([
       this.prisma.$queryRaw<{ day: Date; sales: bigint; units: bigint; orders: bigint }[]>`
         SELECT date_trunc('day', o.placed_at) AS day,
                COALESCE(SUM(i.line_total_paise - i.discount_paise), 0)::bigint AS sales,
@@ -128,6 +128,14 @@ export class InventoryService {
         SELECT COUNT(*) FILTER (WHERE status = 'ACTIVE')::bigint AS active,
                COUNT(*) FILTER (WHERE status = 'ACTIVE' AND stock_qty - reserved_qty <= 0)::bigint AS oos
         FROM offers WHERE seller_id = ${sellerId}::uuid`,
+      this.prisma.$queryRaw<{ pending: bigint; paid: bigint; last: Date | null }[]>`
+        SELECT
+          (SELECT COALESCE(SUM(net_paise), 0) FROM settlement_lines
+            WHERE seller_id = ${sellerId}::uuid AND status IN ('PENDING', 'IN_PAYOUT', 'ON_HOLD'))::bigint AS pending,
+          (SELECT COALESCE(SUM(amount_paise), 0) FROM seller_payouts
+            WHERE seller_id = ${sellerId}::uuid AND status = 'PAID')::bigint AS paid,
+          (SELECT MAX(paid_at) FROM seller_payouts
+            WHERE seller_id = ${sellerId}::uuid AND status = 'PAID') AS last`,
     ]);
     const statusMap = Object.fromEntries(byStatus.map((r) => [r.status, Number(r.n)]));
     const today = daily.find((d) => d.day.getTime() === dayStart.getTime());
@@ -146,8 +154,12 @@ export class InventoryService {
         activeOffers: Number(listings[0]?.active ?? 0),
         outOfStock: Number(listings[0]?.oos ?? 0),
       },
-      // Settlement engine (M5.7) is built by the fulfilment workstream; no payout data yet.
-      payouts: null,
+      // From the settlement engine (M5.7, fulfilment module): delivered-but-unpaid net vs paid out.
+      payouts: {
+        pendingPaise: Number(payouts[0]?.pending ?? 0),
+        paidPaise: Number(payouts[0]?.paid ?? 0),
+        lastPayoutAt: payouts[0]?.last?.toISOString() ?? null,
+      },
       daily: daily.map((d) => ({
         date: d.day.toISOString().slice(0, 10),
         salesPaise: Number(d.sales),

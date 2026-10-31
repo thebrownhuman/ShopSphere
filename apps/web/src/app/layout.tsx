@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
+import { CheckoutHeader, ChromeGate } from '@/components/checkout/chrome';
 import { SiteHeader } from '@/components/header/site-header';
 import { SiteFooter } from '@/components/site-footer';
 import { getCategories } from '@/lib/api/catalog';
@@ -27,11 +28,15 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     <html lang="en-IN">
       <body id="top" className="min-h-screen bg-slate-100 text-slate-900 antialiased">
         <Providers>
-          <SiteHeader categories={categories} />
+          <ChromeGate checkout={<CheckoutHeader />}>
+            <SiteHeader categories={categories} />
+          </ChromeGate>
           <div id="main" tabIndex={-1} className="outline-none">
             {children}
           </div>
-          <SiteFooter />
+          <ChromeGate>
+            <SiteFooter />
+          </ChromeGate>
         </Providers>
       </body>
     </html>

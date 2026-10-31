@@ -1,4 +1,14 @@
--- M5.5–M5.7 (after 20261031160000_seller, whose seller_accounts authorises seller routes): seller order queue, courier shipments + tracking, serviceability snapshot, settlement.
+-- M5.5–M5.7: seller order queue, courier shipments + tracking, serviceability snapshot, settlement.
+
+-- Seller <-> user link (seller portal sign-in). Written by seller onboarding (M5.1).
+CREATE TABLE "seller_users" (
+    "user_id" UUID NOT NULL,
+    "seller_id" UUID NOT NULL,
+    "role" TEXT NOT NULL DEFAULT 'OWNER',
+    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "seller_users_pkey" PRIMARY KEY ("user_id")
+);
+CREATE INDEX "seller_users_seller_id_idx" ON "seller_users"("seller_id");
 
 -- Shipment fulfilment fields.
 ALTER TABLE "shipments"

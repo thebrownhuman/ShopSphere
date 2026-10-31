@@ -61,3 +61,27 @@ corepack pnpm --filter @shopsphere/api k6:setup 500 10
 docker run --rm --add-host host.docker.internal:host-gateway -v "$PWD/infra/k6:/k6" -e API_URL=http://host.docker.internal:4210 grafana/k6:1.3.0 run /k6/checkout-oversell.js
 corepack pnpm --filter @shopsphere/api k6:verify
 ```
+
+## Milestone 5 seller side (Seller Central: onboarding, listings, inventory, dashboard)
+
+Contract: `packages/types/src/seller.ts` (routes and error codes in the file header). Portal: `apps/seller`
+(Next.js, port 3002; `NEXT_PUBLIC_API_URL`, add its origin to the API's `CORS_ORIGINS`).
+
+- A seller is a user with a `seller_accounts` row (migration `20261031160000_seller`). KYC: PAN and GSTIN
+  format + check digit, GSTIN must embed the PAN and match the pickup state; bank account via a
+  simulated penny drop (`seller/penny-drop.ts`: account ending 0000 = no such account, 9999 = name
+  mismatch). Only last 4 digits + a hash of the account number are stored.
+- Approval queue: `GET /seller/admin/applications`, `POST .../:id/approve|reject` with
+  `x-internal-token` (`CATALOG_INTERNAL_TOKEN`) until the admin console (M6). Approval creates the
+  `sellers` row that offers and orders reference. Seed adds a first-party "ShopSphere Retail" account.
+- Listings: form generated from `attribute_definitions` (nearest category wins), variants matrix,
+  image upload (`POST /seller/media`, stored in `seller_media`, served at `GET /seller/media/:id`).
+  New products are indexed into OpenSearch immediately (plus the usual `product.changed` outbox event).
+- Bulk: CSV/XLSX template per category, one row per SKU, `group_id` groups variants, row-level report;
+  `dryRun` validates only. Inventory table edits price/MRP/stock/status inline (stock never below reserved).
+- Dashboard: sales/orders/returns from `order_items` by seller; `payouts` is null until settlements (M5.7).
+
+```bash
+DATABASE_URL=postgresql://shopsphere:shopsphere@localhost:5440/m5_seller corepack pnpm --filter @shopsphere/api test:int -- seller
+corepack pnpm --filter @shopsphere/seller test:e2e   # API 4210, portal 3130, storefront 3140
+```
