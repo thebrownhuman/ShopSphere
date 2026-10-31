@@ -86,7 +86,13 @@ export function BuyBox() {
               ))}
             </select>
           </label>
-          <AddToCartButton block sku={offer.skuId} sellerId={offer.sellerId} qty={qty} price={offer.price} />
+          <AddToCartButton
+            block
+            sku={offer.skuId}
+            sellerId={offer.sellerId}
+            qty={qty}
+            price={offer.price}
+          />
           <Button block variant="buy" onClick={notYet} data-testid="buy-now">
             Buy Now
           </Button>

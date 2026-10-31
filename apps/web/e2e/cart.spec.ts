@@ -22,7 +22,10 @@ async function latestOtp(request: APIRequestContext, to: string): Promise<string
 const count = (page: Page) => page.getByTestId('cart-count');
 
 async function addFromTile(page: Page, index: number): Promise<string> {
-  const tile = page.getByTestId('product-tile').filter({ has: page.getByTestId('add-to-cart') }).nth(index);
+  const tile = page
+    .getByTestId('product-tile')
+    .filter({ has: page.getByTestId('add-to-cart') })
+    .nth(index);
   const title = (await tile.getByRole('heading').textContent())!.trim();
   await tile.getByTestId('add-to-cart').click();
   const drawer = page.getByTestId('added-drawer');
@@ -32,8 +35,8 @@ async function addFromTile(page: Page, index: number): Promise<string> {
   return title;
 }
 
-const line = (page: Page, title: string) =>
-  page.getByTestId('cart-line').filter({ has: page.getByRole('link', { name: title, exact: true }) });
+/** Seed data repeats titles across products, so lines are addressed by position (oldest first). */
+const qtys = (page: Page) => page.getByTestId('line-qty');
 
 test('guest add → cart → update qty → sign in → cart merged', async ({ page, request }) => {
   const email = `cart-${Date.now()}@example.test`;
@@ -62,14 +65,14 @@ test('guest add → cart → update qty → sign in → cart merged', async ({ p
   // Guest: same item plus another one.
   await page.goto('/s?k=headphones');
   expect(await addFromTile(page, 0)).toBe(first);
-  const second = await addFromTile(page, 1);
+  await addFromTile(page, 1);
   await expect(count(page)).toHaveText('2');
 
   await page.getByTestId('cart-link').click();
   await expect(page).toHaveURL(/\/cart$/);
   await expect(page.getByTestId('cart-line')).toHaveCount(2);
   const before = await page.getByTestId('cart-subtotal').textContent();
-  await line(page, second).getByTestId('line-qty').selectOption('2');
+  await qtys(page).nth(1).selectOption('2');
   await expect(count(page)).toHaveText('3');
   await expect(page.getByTestId('cart-subtotal')).not.toHaveText(before!);
   await expect(page.getByTestId('cart-summary')).toContainText('Subtotal (3 items)');
@@ -84,8 +87,9 @@ test('guest add → cart → update qty → sign in → cart merged', async ({ p
   await expect(page.getByTestId('account-link')).toContainText('Hello, Cart Shopper');
 
   await expect(page.getByTestId('cart-line')).toHaveCount(2);
-  await expect(line(page, first).getByTestId('line-qty')).toHaveValue('2');
-  await expect(line(page, second).getByTestId('line-qty')).toHaveValue('2');
+  // Same SKU in both carts: 1 (account) + 1 (guest). Guest-only line keeps its qty of 2.
+  await expect(qtys(page).nth(0)).toHaveValue('2');
+  await expect(qtys(page).nth(1)).toHaveValue('2');
   await expect(count(page)).toHaveText('4');
   await expect(page.getByTestId('proceed-to-buy')).toHaveAttribute('href', '/checkout');
 });

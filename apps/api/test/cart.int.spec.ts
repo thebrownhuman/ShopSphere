@@ -71,12 +71,23 @@ describe('cart (integration, real Postgres)', () => {
     const brand = await prisma.brand.create({ data: { slug: `brand-${run}`, name: 'Brandy' } });
     const seller = (n: string) =>
       prisma.seller.create({
-        data: { name: `Seller ${n}`, slug: `seller-${n}-${run}`, pincode: '560001', city: 'Bengaluru', state: 'KA' },
+        data: {
+          name: `Seller ${n}`,
+          slug: `seller-${n}-${run}`,
+          pincode: '560001',
+          city: 'Bengaluru',
+          state: 'KA',
+        },
       });
     sellerA = (await seller('a')).id;
     sellerB = (await seller('b')).id;
     const product = await prisma.product.create({
-      data: { slug: `cart-product-${run}`, title: 'Cart Test Phone', brandId: brand.id, categoryId: cat.id },
+      data: {
+        slug: `cart-product-${run}`,
+        title: 'Cart Test Phone',
+        brandId: brand.id,
+        categoryId: cat.id,
+      },
     });
     // name -> [stock, maxPerOrder, status]
     const specs: Record<string, [number, number, string]> = {
@@ -93,17 +104,37 @@ describe('cart (integration, real Postgres)', () => {
     let pos = 0;
     for (const [name, [stockQty, maxPerOrder, status]] of Object.entries(specs)) {
       const s = await prisma.sku.create({
-        data: { productId: product.id, code: `${name}-${run}`, attributes: { color: name }, position: pos++ },
+        data: {
+          productId: product.id,
+          code: `${name}-${run}`,
+          attributes: { color: name },
+          position: pos++,
+        },
       });
       sku[name] = s.id;
       const o = await prisma.offer.create({
-        data: { skuId: s.id, sellerId: sellerA, price: 20_000n, mrp: 25_000n, stockQty, maxPerOrder, status },
+        data: {
+          skuId: s.id,
+          sellerId: sellerA,
+          price: 20_000n,
+          mrp: 25_000n,
+          stockQty,
+          maxPerOrder,
+          status,
+        },
       });
       offer[name] = o.id;
     }
     // A pricier second seller on `std`: the buy box stays with seller A.
     await prisma.offer.create({
-      data: { skuId: sku.std, sellerId: sellerB, price: 21_000n, mrp: 25_000n, stockQty: 50, maxPerOrder: 5 },
+      data: {
+        skuId: sku.std,
+        sellerId: sellerB,
+        price: 21_000n,
+        mrp: 25_000n,
+        stockQty: 50,
+        maxPerOrder: 5,
+      },
     });
   });
 
@@ -138,23 +169,37 @@ describe('cart (integration, real Postgres)', () => {
   it('enforces limits: per-order, stock, 10 per item, line count, serviceability, live offer', async () => {
     const c = cookieOf(await guestAdd({ sku: sku.std, qty: 1 }).expect(201))!;
     const limit = await guestAdd({ sku: sku.std, qty: 5 }, c).expect(409);
-    expect(limit.body).toMatchObject({ code: 'QTY_LIMIT', message: 'You can buy only 5 of this item' });
+    expect(limit.body).toMatchObject({
+      code: 'QTY_LIMIT',
+      message: 'You can buy only 5 of this item',
+    });
     const low = await guestAdd({ sku: sku.low, qty: 3 }, c).expect(409);
     expect(low.body).toMatchObject({ code: 'INSUFFICIENT_STOCK', message: 'Only 2 available' });
     const ten = await guestAdd({ sku: sku.big, qty: 11 }, c).expect(409);
     expect(ten.body).toMatchObject({ code: 'QTY_LIMIT', details: { limit: 10 } });
     const pin = await guestAdd({ sku: sku.m1, qty: 1, pincode: '744101' }, c).expect(422);
-    expect(pin.body).toMatchObject({ code: 'NOT_SERVICEABLE', message: 'Not deliverable to 744101' });
-    expect((await guestAdd({ sku: sku.off, qty: 1 }, c).expect(422)).body.code).toBe('OFFER_UNAVAILABLE');
-    expect((await guestAdd({ sku: sku.std, sellerId: sellerB, qty: 1 }, c).expect(201)).body.cart.summary.lineCount).toBe(2);
+    expect(pin.body).toMatchObject({
+      code: 'NOT_SERVICEABLE',
+      message: 'Not deliverable to 744101',
+    });
+    expect((await guestAdd({ sku: sku.off, qty: 1 }, c).expect(422)).body.code).toBe(
+      'OFFER_UNAVAILABLE',
+    );
+    expect(
+      (await guestAdd({ sku: sku.std, sellerId: sellerB, qty: 1 }, c).expect(201)).body.cart.summary
+        .lineCount,
+    ).toBe(2);
     await guestAdd({ sku: sku.m1, qty: 1 }, c).expect(201);
     await guestAdd({ sku: sku.m2, qty: 1 }, c).expect(201);
     const full = await guestAdd({ sku: sku.m3, qty: 1 }, c).expect(409);
     expect(full.body.code).toBe('CART_FULL');
     // Raising qty past the limit via PATCH is refused too; lowering is fine.
     const cart = (await http().get('/cart').set('cookie', c)).body;
-    const lineId = cart.groups.flatMap((g: { lines: { id: string; skuId: string; sellerId: string }[] }) => g.lines)
-      .find((l: { skuId: string; sellerId: string }) => l.skuId === sku.std && l.sellerId === sellerA).id;
+    const lineId = cart.groups
+      .flatMap((g: { lines: { id: string; skuId: string; sellerId: string }[] }) => g.lines)
+      .find(
+        (l: { skuId: string; sellerId: string }) => l.skuId === sku.std && l.sellerId === sellerA,
+      ).id;
     await http().patch(`/cart/items/${lineId}`).set('cookie', c).send({ qty: 6 }).expect(409);
     await http().patch(`/cart/items/${lineId}`).set('cookie', c).send({ qty: 4 }).expect(200);
   });
@@ -217,7 +262,10 @@ describe('cart (integration, real Postgres)', () => {
         lineTotal: 36_000,
       });
     } finally {
-      await prisma.offer.update({ where: { id: offer.m4 }, data: { price: 20_000n, stockQty: 50 } });
+      await prisma.offer.update({
+        where: { id: offer.m4 },
+        data: { price: 20_000n, stockQty: 50 },
+      });
     }
   });
 
@@ -250,8 +298,16 @@ describe('cart (integration, real Postgres)', () => {
       },
     });
     const userAuth = `Bearer ${(await sessions.create(user.id, false, {})).accessToken}`;
-    await http().post('/cart/items').set('authorization', userAuth).send({ sku: sku.std, qty: 3 }).expect(201);
-    await http().post('/cart/items').set('authorization', userAuth).send({ sku: sku.m1, qty: 1 }).expect(201);
+    await http()
+      .post('/cart/items')
+      .set('authorization', userAuth)
+      .send({ sku: sku.std, qty: 3 })
+      .expect(201);
+    await http()
+      .post('/cart/items')
+      .set('authorization', userAuth)
+      .send({ sku: sku.m1, qty: 1 })
+      .expect(201);
 
     const g = cookieOf(await guestAdd({ sku: sku.std, qty: 4 }).expect(201))!;
     await guestAdd({ sku: sku.m2, qty: 2 }, g).expect(201);
@@ -268,7 +324,9 @@ describe('cart (integration, real Postgres)', () => {
       await http().get('/cart').set('authorization', `Bearer ${login.body.accessToken}`).expect(200)
     ).body;
     const qty = Object.fromEntries(
-      cart.groups.flatMap((gr: { lines: { skuId: string; qty: number }[] }) => gr.lines).map((l: { skuId: string; qty: number }) => [l.skuId, l.qty]),
+      cart.groups
+        .flatMap((gr: { lines: { skuId: string; qty: number }[] }) => gr.lines)
+        .map((l: { skuId: string; qty: number }) => [l.skuId, l.qty]),
     );
     expect(qty).toEqual({ [sku.std]: 5, [sku.m1]: 1, [sku.m2]: 2 });
     // The old guest cookie no longer reaches a cart.
@@ -289,9 +347,17 @@ describe('cart (integration, real Postgres)', () => {
   it('wishlist CRUD and move to cart (signed in only)', async () => {
     await http().get('/wishlist').expect(401);
     const u = await newUser();
-    const added = await http().post('/wishlist/items').set('authorization', u.auth).send({ sku: sku.m3 }).expect(201);
+    const added = await http()
+      .post('/wishlist/items')
+      .set('authorization', u.auth)
+      .send({ sku: sku.m3 })
+      .expect(201);
     expect(added.body.items).toHaveLength(1);
-    await http().post('/wishlist/items').set('authorization', u.auth).send({ sku: sku.m3 }).expect(201);
+    await http()
+      .post('/wishlist/items')
+      .set('authorization', u.auth)
+      .send({ sku: sku.m3 })
+      .expect(201);
     const list = (await http().get('/wishlist').set('authorization', u.auth)).body;
     expect(list.items).toHaveLength(1);
     expect(list.items[0]).toMatchObject({ skuId: sku.m3, price: 20_000, inStock: true });

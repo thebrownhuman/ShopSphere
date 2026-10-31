@@ -1,20 +1,8 @@
 'use client';
 
-import type {
-  AddToCartResponse,
-  CartLine,
-  CartResponse,
-  ProductCard,
-} from '@shopsphere/types';
+import type { AddToCartResponse, CartLine, CartResponse, ProductCard } from '@shopsphere/types';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react';
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import { track } from './analytics';
 import { ApiRequestError, apiRequest, type RequestOptions } from './api';
 import { useAuth } from './auth';
@@ -61,10 +49,7 @@ const message = (err: unknown) =>
 const allLines = (c: CartResponse | undefined) => c?.groups.flatMap((g) => g.lines) ?? [];
 
 /** Optimistic edit of one line; the server response replaces it moments later. */
-function patchLines(
-  cart: CartResponse,
-  fn: (line: CartLine) => CartLine | null,
-): CartResponse {
+function patchLines(cart: CartResponse, fn: (line: CartLine) => CartLine | null): CartResponse {
   const groups = cart.groups
     .map((g) => ({ ...g, lines: g.lines.map(fn).filter((l): l is CartLine => l !== null) }))
     .filter((g) => g.lines.length > 0);
@@ -167,11 +152,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const setQty = useCallback(
     (line: CartLine, qty: number) => {
       if (qty < line.qty) {
-        track('remove_from_cart', { sku: line.skuId, qty: line.qty - qty, value: line.unitPrice * (line.qty - qty) });
+        track('remove_from_cart', {
+          sku: line.skuId,
+          qty: line.qty - qty,
+          value: line.unitPrice * (line.qty - qty),
+        });
       }
       return write(
         () => call<CartResponse>(`/cart/items/${line.id}`, { method: 'PATCH', body: { qty } }),
-        (c) => patchLines(c, (l) => (l.id === line.id ? { ...l, qty, lineTotal: l.unitPrice * qty } : l)),
+        (c) =>
+          patchLines(c, (l) =>
+            l.id === line.id ? { ...l, qty, lineTotal: l.unitPrice * qty } : l,
+          ),
       );
     },
     [call, write],
@@ -191,7 +183,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const saveForLater = useCallback(
     (lineId: string) =>
       write(
-        () => call<CartResponse>(`/cart/items/${lineId}/save-for-later`, { method: 'POST', body: {} }),
+        () =>
+          call<CartResponse>(`/cart/items/${lineId}/save-for-later`, { method: 'POST', body: {} }),
         (c) => patchLines(c, (l) => (l.id === lineId ? null : l)),
       ),
     [call, write],
@@ -199,7 +192,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const moveToCart = useCallback(
     (savedId: string) =>
-      write(() => call<CartResponse>(`/cart/saved/${savedId}/move-to-cart`, { method: 'POST', body: {} })),
+      write(() =>
+        call<CartResponse>(`/cart/saved/${savedId}/move-to-cart`, { method: 'POST', body: {} }),
+      ),
     [call, write],
   );
 

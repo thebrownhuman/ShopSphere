@@ -104,7 +104,11 @@ export function AddedToCartDrawer() {
                     />
                   )}
                   <div className="min-w-0 flex-1 text-sm">
-                    <Link href={`/p/${p.slug}`} onClick={closeDrawer} className="line-clamp-2 hover:underline">
+                    <Link
+                      href={`/p/${p.slug}`}
+                      onClick={closeDrawer}
+                      className="line-clamp-2 hover:underline"
+                    >
                       {p.title}
                     </Link>
                     {p.pricing && <Price price={p.pricing.price} size="sm" />}

@@ -12,7 +12,10 @@ const offer = (o: Partial<LiveOffer> = {}): LiveOffer => ({
 
 describe('cart pricing engine', () => {
   it('computes line totals from live prices, never the snapshot', () => {
-    const r = priceLine({ qty: 2, snapshotPrice: 22_000, offer: offer(), serviceable: true }, limits);
+    const r = priceLine(
+      { qty: 2, snapshotPrice: 22_000, offer: offer(), serviceable: true },
+      limits,
+    );
     expect(r).toMatchObject({ unitPrice: 20_000, lineTotal: 40_000, maxQty: 5, inStock: true });
     expect(r.priceChange).toEqual({ from: 22_000, to: 20_000 });
     expect(r.stockChange).toBeNull();
@@ -28,17 +31,26 @@ describe('cart pricing engine', () => {
   });
 
   it('flags out of stock and unavailable offers with zero totals', () => {
-    const oos = priceLine({ qty: 1, snapshotPrice: 1, offer: offer({ available: 0 }), serviceable: true }, limits);
-    expect(oos).toMatchObject({ stockChange: 'OUT_OF_STOCK', lineTotal: 0, inStock: false });
-    const gone = priceLine({ qty: 1, snapshotPrice: 1, offer: offer({ active: false }), serviceable: true }, limits);
-    expect(gone).toMatchObject({ stockChange: 'UNAVAILABLE', unitPrice: 0, priceChange: null });
-    expect(priceLine({ qty: 1, snapshotPrice: 1, offer: null, serviceable: true }, limits).stockChange).toBe(
-      'UNAVAILABLE',
+    const oos = priceLine(
+      { qty: 1, snapshotPrice: 1, offer: offer({ available: 0 }), serviceable: true },
+      limits,
     );
+    expect(oos).toMatchObject({ stockChange: 'OUT_OF_STOCK', lineTotal: 0, inStock: false });
+    const gone = priceLine(
+      { qty: 1, snapshotPrice: 1, offer: offer({ active: false }), serviceable: true },
+      limits,
+    );
+    expect(gone).toMatchObject({ stockChange: 'UNAVAILABLE', unitPrice: 0, priceChange: null });
+    expect(
+      priceLine({ qty: 1, snapshotPrice: 1, offer: null, serviceable: true }, limits).stockChange,
+    ).toBe('UNAVAILABLE');
   });
 
   it('excludes undeliverable lines from totals', () => {
-    const r = priceLine({ qty: 1, snapshotPrice: 20_000, offer: offer(), serviceable: false }, limits);
+    const r = priceLine(
+      { qty: 1, snapshotPrice: 20_000, offer: offer(), serviceable: false },
+      limits,
+    );
     expect(r.lineTotal).toBe(0);
     expect(summarise([{ priced: r, serviceable: false }], limits).hasIssues).toBe(true);
   });
@@ -51,7 +63,15 @@ describe('cart pricing engine', () => {
 
   it('summary: delivery fee below threshold, free at threshold, progress remaining', () => {
     const line = (price: number, qty = 1) => ({
-      priced: priceLine({ qty, snapshotPrice: price, offer: offer({ price, mrp: price + 1_000 }), serviceable: true }, limits),
+      priced: priceLine(
+        {
+          qty,
+          snapshotPrice: price,
+          offer: offer({ price, mrp: price + 1_000 }),
+          serviceable: true,
+        },
+        limits,
+      ),
       serviceable: true,
     });
     const below = summarise([line(37_900)], limits);
@@ -65,7 +85,12 @@ describe('cart pricing engine', () => {
       itemCount: 1,
     });
     const at = summarise([line(24_950, 2)], limits);
-    expect(at).toMatchObject({ subtotal: 49_900, deliveryFee: 0, freeDeliveryRemaining: 0, freeDeliveryEligible: true });
+    expect(at).toMatchObject({
+      subtotal: 49_900,
+      deliveryFee: 0,
+      freeDeliveryRemaining: 0,
+      freeDeliveryEligible: true,
+    });
     expect(summarise([], limits)).toMatchObject({ subtotal: 0, deliveryFee: 0, total: 0 });
   });
 });

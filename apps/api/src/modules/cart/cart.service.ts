@@ -199,7 +199,10 @@ export class CartService {
       const { productId, offer } = await this.resolveOffer(tx, input.sku, input.sellerId);
       const where = { cartId, skuId: input.sku, sellerId: offer.sellerId };
       const existing = await tx.cartItem.findUnique({ where: { cartId_skuId_sellerId: where } });
-      if (!existing && (await tx.cartItem.count({ where: { cartId } })) >= this.cfg.CART_MAX_LINES) {
+      if (
+        !existing &&
+        (await tx.cartItem.count({ where: { cartId } })) >= this.cfg.CART_MAX_LINES
+      ) {
         throw new AppError(
           'CART_FULL',
           `Your cart can hold up to ${this.cfg.CART_MAX_LINES} different items`,
@@ -237,7 +240,10 @@ export class CartService {
   }
 
   /** Idempotent: deleting a line another tab already removed is not an error. */
-  async removeItem(owner: CartOwner, lineId: string): Promise<{ cartId: string | null; removed: boolean }> {
+  async removeItem(
+    owner: CartOwner,
+    lineId: string,
+  ): Promise<{ cartId: string | null; removed: boolean }> {
     const cartId = await this.findCartId(owner);
     if (!cartId) return { cartId: null, removed: false };
     const removed = await this.locked(cartId, async (tx) => {
@@ -272,15 +278,28 @@ export class CartService {
       const { offer } = await this.resolveOffer(tx, saved.skuId, saved.sellerId);
       const key = { cartId, skuId: saved.skuId, sellerId: saved.sellerId };
       const existing = await tx.cartItem.findUnique({ where: { cartId_skuId_sellerId: key } });
-      if (!existing && (await tx.cartItem.count({ where: { cartId } })) >= this.cfg.CART_MAX_LINES) {
-        throw new AppError('CART_FULL', `Your cart can hold up to ${this.cfg.CART_MAX_LINES} different items`, 409);
+      if (
+        !existing &&
+        (await tx.cartItem.count({ where: { cartId } })) >= this.cfg.CART_MAX_LINES
+      ) {
+        throw new AppError(
+          'CART_FULL',
+          `Your cart can hold up to ${this.cfg.CART_MAX_LINES} different items`,
+          409,
+        );
       }
       this.checkQty(offer, (existing?.qty ?? 0) + 1);
       if (existing) {
         await tx.cartItem.update({ where: { id: existing.id }, data: { qty: existing.qty + 1 } });
       } else {
         await tx.cartItem.create({
-          data: { ...key, productId: saved.productId, offerId: offer.id, qty: 1, priceSnapshot: offer.price },
+          data: {
+            ...key,
+            productId: saved.productId,
+            offerId: offer.id,
+            qty: 1,
+            priceSnapshot: offer.price,
+          },
         });
       }
       await tx.savedItem.delete({ where: { id: saved.id } });
@@ -300,7 +319,10 @@ export class CartService {
    * cannot deadlock), sums matching lines capped at live limits, appends new lines up to the line
    * limit and moves overflow to Saved for later. The guest cart is closed as MERGED.
    */
-  async mergeGuestCart(guestToken: string, userId: string): Promise<{ merged: number; dropped: number }> {
+  async mergeGuestCart(
+    guestToken: string,
+    userId: string,
+  ): Promise<{ merged: number; dropped: number }> {
     const guestId = await this.findCartId({ guestToken });
     if (!guestId) return { merged: 0, dropped: 0 };
     const { cartId: userCartId } = await this.ensureCart({ userId });
@@ -329,11 +351,15 @@ export class CartService {
         guestItems,
         (l) => {
           const o = offerFor(l);
-          return lineCap(live(o, o?.sku.product.status === 'ACTIVE'), this.cfg.CART_MAX_QTY_PER_ITEM);
+          return lineCap(
+            live(o, o?.sku.product.status === 'ACTIVE'),
+            this.cfg.CART_MAX_QTY_PER_ITEM,
+          );
         },
         this.limits,
       );
-      for (const u of plan.updates) await tx.cartItem.update({ where: { id: u.id }, data: { qty: u.qty } });
+      for (const u of plan.updates)
+        await tx.cartItem.update({ where: { id: u.id }, data: { qty: u.qty } });
       const guestLine = (l: { skuId: string; sellerId: string }) =>
         guestItems.find((g) => g.skuId === l.skuId && g.sellerId === l.sellerId)!;
       if (plan.inserts.length > 0) {
@@ -353,10 +379,7 @@ export class CartService {
           }),
         });
       }
-      const toSave = [
-        ...plan.dropped.map((l) => guestLine(l)),
-        ...guestSaved,
-      ];
+      const toSave = [...plan.dropped.map((l) => guestLine(l)), ...guestSaved];
       if (toSave.length > 0) {
         await tx.savedItem.createMany({
           data: toSave.map((s) => ({

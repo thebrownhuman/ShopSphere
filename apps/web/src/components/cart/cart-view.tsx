@@ -141,17 +141,29 @@ function LineRow({ line }: { line: CartLine }) {
               data-testid="line-qty"
             >
               {Array.from({ length: options }, (_, i) => (
-                <option key={i + 1} value={i + 1} disabled={i + 1 > line.maxQty && i + 1 > line.qty}>
+                <option
+                  key={i + 1}
+                  value={i + 1}
+                  disabled={i + 1 > line.maxQty && i + 1 > line.qty}
+                >
                   {i + 1}
                 </option>
               ))}
             </select>
           </label>
-          <span aria-hidden="true" className="text-slate-300">|</span>
-          <button type="button" className="text-brand-dark hover:underline" onClick={() => void run(remove(line))}>
+          <span aria-hidden="true" className="text-slate-300">
+            |
+          </span>
+          <button
+            type="button"
+            className="text-brand-dark hover:underline"
+            onClick={() => void run(remove(line))}
+          >
             Delete
           </button>
-          <span aria-hidden="true" className="text-slate-300">|</span>
+          <span aria-hidden="true" className="text-slate-300">
+            |
+          </span>
           <button
             type="button"
             className="text-brand-dark hover:underline"
@@ -161,8 +173,14 @@ function LineRow({ line }: { line: CartLine }) {
           </button>
           {line.slug && (
             <>
-              <span aria-hidden="true" className="text-slate-300">|</span>
-              <button type="button" className="text-brand-dark hover:underline" onClick={() => void share()}>
+              <span aria-hidden="true" className="text-slate-300">
+                |
+              </span>
+              <button
+                type="button"
+                className="text-brand-dark hover:underline"
+                onClick={() => void share()}
+              >
                 {copied ? 'Link copied' : 'Share'}
               </button>
             </>
@@ -182,7 +200,10 @@ function SavedRow({ item }: { item: SavedItem }) {
   const { moveToCart, removeSaved } = useCart();
   const { error, run } = useAction();
   return (
-    <li className="flex gap-4 border-b border-slate-200 py-4 last:border-0" data-testid="saved-item">
+    <li
+      className="flex gap-4 border-b border-slate-200 py-4 last:border-0"
+      data-testid="saved-item"
+    >
       <Thumb image={item.image} slug={item.slug} />
       <div className="min-w-0 flex-1 space-y-1 text-sm">
         <h3 className="font-medium">{item.title}</h3>
@@ -194,7 +215,11 @@ function SavedRow({ item }: { item: SavedItem }) {
               Move to cart
             </Button>
           )}
-          <button type="button" className="text-brand-dark hover:underline" onClick={() => void run(removeSaved(item.id))}>
+          <button
+            type="button"
+            className="text-brand-dark hover:underline"
+            onClick={() => void run(removeSaved(item.id))}
+          >
             Delete
           </button>
         </div>
@@ -212,7 +237,11 @@ function Summary({ cart }: { cart: CartResponse }) {
   const s = cart.summary;
   const progress = s.freeDeliveryThreshold > 0 ? (s.subtotal / s.freeDeliveryThreshold) * 100 : 100;
   return (
-    <aside aria-label="Order summary" className="space-y-3 bg-white p-4 lg:sticky lg:top-32" data-testid="cart-summary">
+    <aside
+      aria-label="Order summary"
+      className="space-y-3 bg-white p-4 lg:sticky lg:top-32"
+      data-testid="cart-summary"
+    >
       {s.freeDeliveryEligible ? (
         <p className="text-sm text-green-800">✓ Your order is eligible for FREE delivery.</p>
       ) : (
@@ -260,7 +289,9 @@ function Summary({ cart }: { cart: CartResponse }) {
         </Button>
       )}
       {s.hasIssues && (
-        <p className="text-xs text-amber-800">Some items need attention; only available items are counted.</p>
+        <p className="text-xs text-amber-800">
+          Some items need attention; only available items are counted.
+        </p>
       )}
     </aside>
   );
@@ -274,7 +305,11 @@ export function CartView() {
   useEffect(() => {
     if (cart && !viewed.current) {
       viewed.current = true;
-      track('view_cart', { items: cart.summary.itemCount, value: cart.summary.subtotal, currency: 'INR' });
+      track('view_cart', {
+        items: cart.summary.itemCount,
+        value: cart.summary.subtotal,
+        currency: 'INR',
+      });
     }
   }, [cart]);
 
@@ -287,7 +322,9 @@ export function CartView() {
     );
   }
   if (isError || !cart) {
-    return <p className="bg-white p-6 text-deal">We couldn&apos;t load your cart. Please refresh.</p>;
+    return (
+      <p className="bg-white p-6 text-deal">We couldn&apos;t load your cart. Please refresh.</p>
+    );
   }
 
   const lines = cart.groups.flatMap((g) => g.lines);
@@ -311,9 +348,19 @@ export function CartView() {
               </h1>
               <Banners lines={lines} />
               {cart.groups.map((g) => (
-                <section key={g.key} aria-label={`Sold by ${g.sellerName}`} className="mb-2" data-testid="cart-group">
+                <section
+                  key={g.key}
+                  aria-label={`Sold by ${g.sellerName}`}
+                  className="mb-2"
+                  data-testid="cart-group"
+                >
                   <h2 className="border-b border-slate-200 pb-2 text-sm text-slate-700">
-                    Sold by <b>{g.fulfilment === 'SHOPSPHERE' ? `${g.sellerName} · Fulfilled by ShopSphere` : g.sellerName}</b>
+                    Sold by{' '}
+                    <b>
+                      {g.fulfilment === 'SHOPSPHERE'
+                        ? `${g.sellerName} · Fulfilled by ShopSphere`
+                        : g.sellerName}
+                    </b>
                     {g.deliveryDate && <> · Delivery by {formatDeliveryDate(g.deliveryDate)}</>}
                   </h2>
                   <ul>
@@ -324,8 +371,8 @@ export function CartView() {
                 </section>
               ))}
               <p className="text-right text-lg">
-                Subtotal ({cart.summary.itemCount} {cart.summary.itemCount === 1 ? 'item' : 'items'}):{' '}
-                <b>{formatPrice(cart.summary.subtotal)}</b>
+                Subtotal ({cart.summary.itemCount} {cart.summary.itemCount === 1 ? 'item' : 'items'}
+                ): <b>{formatPrice(cart.summary.subtotal)}</b>
               </p>
             </>
           )}

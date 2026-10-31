@@ -1,10 +1,4 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  Inject,
-  Injectable,
-  OnModuleInit,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import type { CookieOptions, Request, Response } from 'express';
 import { SessionService } from '../identity/tokens/session.service';
 import { AppError } from '../shared/errors/app-error';
