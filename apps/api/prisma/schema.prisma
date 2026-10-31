@@ -186,3 +186,95 @@ model Pincode {
 
   @@map("pincodes")
 }
+
+// ---------------------------------------------------------------------------
+// Payments (M4.10-M4.18). Owned by src/modules/payment. Status columns are TEXT;
+// allowed values live in payment/domain/payment.types.ts.
+// ---------------------------------------------------------------------------
+
+/// One gateway order per initiate call. A shop order may have several (retry with another method).
+model Payment {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId         String   @map("order_id")
+  provider        String
+  providerOrderId String   @map("provider_order_id")
+  amount          BigInt
+  currency        String   @default("INR")
+  status          String
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  attempts PaymentAttempt[]
+
+  @@unique([provider, providerOrderId], map: "uq_payments_provider_order")
+  @@index([orderId], map: "idx_payments_order_id")
+  @@index([status, createdAt], map: "idx_payments_status_created")
+  @@map("payments")
+}
+
+/// One row per gateway payment id seen for a payment (redirect, webhook or reconciliation).
+model PaymentAttempt {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  paymentId         String   @map("payment_id") @db.Uuid
+  orderId           String   @map("order_id")
+  provider          String
+  providerPaymentId String   @map("provider_payment_id")
+  amount            BigInt
+  currency          String
+  method            String?
+  status            String
+  errorReason       String?  @map("error_reason")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  payment Payment  @relation(fields: [paymentId], references: [id])
+  refunds Refund[]
+
+  @@unique([provider, providerPaymentId], map: "uq_payment_attempts_provider_payment")
+  @@index([orderId], map: "idx_payment_attempts_order_id")
+  @@map("payment_attempts")
+}
+
+/// First-capture-wins lock: at most one winning captured attempt per shop order.
+model OrderPaymentCapture {
+  orderId   String   @id @map("order_id")
+  attemptId String   @map("attempt_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("order_payment_captures")
+}
+
+/// Verified gateway webhooks, stored once per (provider, event id) for idempotent processing.
+model WebhookEvent {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider    String
+  eventId     String    @map("event_id")
+  eventType   String    @map("event_type")
+  payload     Json
+  outcome     String?
+  receivedAt  DateTime  @default(now()) @map("received_at") @db.Timestamptz(6)
+  processedAt DateTime? @map("processed_at") @db.Timestamptz(6)
+
+  @@unique([provider, eventId], map: "uq_webhook_events_provider_event")
+  @@map("webhook_events")
+}
+
+model Refund {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  attemptId        String   @map("attempt_id") @db.Uuid
+  orderId          String   @map("order_id")
+  provider         String
+  providerRefundId String?  @unique(map: "uq_refunds_provider_refund") @map("provider_refund_id")
+  amount           BigInt
+  reason           String
+  status           String
+  lastError        String?  @map("last_error")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  attempt PaymentAttempt @relation(fields: [attemptId], references: [id])
+
+  @@index([status], map: "idx_refunds_status")
+  @@index([orderId], map: "idx_refunds_order_id")
+  @@map("refunds")
+}

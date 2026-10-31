@@ -5,7 +5,7 @@ import { defineConfig, devices } from '@playwright/test';
  * their own ports and a dedicated `shopsphere_e2e` database so local data is untouched.
  * Override E2E_DATABASE_URL / E2E_REDIS_URL if your compose ports differ.
  */
-const API_PORT = Number(process.env.E2E_API_PORT ?? 4100);
+const API_PORT = Number(process.env.E2E_API_PORT ?? 4200);
 const WEB_PORT = Number(process.env.E2E_WEB_PORT ?? 3100);
 const API_URL = `http://localhost:${API_PORT}`;
 const WEB_URL = `http://localhost:${WEB_PORT}`;

@@ -91,10 +91,27 @@ Done: M1.1–M1.14 except where noted. Module: `apps/api/src/modules/identity`; 
 Not yet: guest-cart merge on sign-in (needs M3 cart), real SMS/SES adapters, full India Post pincode
 data (seed has a sample), TOTP secret encryption at rest, Delete account (DPDP).
 
-E2E (needs `pnpm infra:up`; uses its own `shopsphere_e2e` database and ports 4100/3100):
+E2E (needs `pnpm infra:up`; uses its own `shopsphere_e2e` database and ports 4200/3100):
 
 ```bash
 pnpm --filter @shopsphere/web exec playwright install chromium
 pnpm --filter @shopsphere/web test:e2e
 # non-default compose ports: E2E_DATABASE_URL=postgresql://shopsphere:shopsphere@localhost:5440/shopsphere_e2e E2E_REDIS_URL=redis://localhost:6390/5
 ```
+## Payments (M4.10–M4.18 foundation, ahead of checkout)
+
+`apps/api/src/modules/payment` + `apps/bank-sim` (see its README for test cards and protocol).
+
+- Providers behind `PaymentProvider`: `bank` (ShopSphere Bank simulator, always on) and `razorpay`
+  (test mode; enabled only when `RAZORPAY_KEY_ID` (`rzp_test_…`), `RAZORPAY_KEY_SECRET` and
+  `RAZORPAY_WEBHOOK_SECRET` are set; point the Razorpay dashboard webhook at
+  `<public api url>/payments/webhooks/razorpay`, e.g. via a tunnel).
+- Routes: `POST /payments/:orderId/initiate` (Idempotency-Key), `POST /payments/:orderId/verify`,
+  `GET /payments/:orderId/status`, `POST /payments/webhooks/:provider`, internal (`x-internal-token`):
+  `POST /payments/:orderId/refunds`, `POST /payments/internal/reconcile`. Dev only: `POST /payments/dev/orders`.
+- Orders come from `PayableOrderSource`; `StubOrderSource` (in memory) stands in until the orders module.
+- Paid only on a verified webhook / reconciliation fetch; events stored once in `webhook_events`; first
+  capture wins (`order_payment_captures`), later captures auto-refunded; reconciliation runs from
+  `apps/workers` every 5 min.
+
+Try it: `pnpm --filter @shopsphere/bank-sim dev`, run the API and web, open http://localhost:3000/dev/pay.
