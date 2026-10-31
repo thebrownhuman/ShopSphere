@@ -8,6 +8,8 @@ import { PriceBlock, Variants } from '@/components/pdp/details';
 import { Gallery } from '@/components/pdp/gallery';
 import { LiveEffects } from '@/components/pdp/live-effects';
 import { PdpProvider } from '@/components/pdp/pdp-context';
+import { QuestionsSection } from '@/components/pdp/questions';
+import { ReviewsSection } from '@/components/pdp/reviews';
 import { RecentlyViewed } from '@/components/recently-viewed';
 import { getProduct } from '@/lib/api/catalog';
 import { SITE_URL } from '@/lib/site';
@@ -95,7 +97,9 @@ export default async function ProductPage({ params }: Props) {
               <h1 className="mt-1 text-xl font-medium leading-snug md:text-2xl">{product.title}</h1>
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                 <span className="font-semibold">{product.rating.toFixed(1)}</span>
-                <RatingStars rating={product.rating} count={product.ratingCount} size="md" />
+                <a href="#reviews" className="hover:underline">
+                  <RatingStars rating={product.rating} count={product.ratingCount} size="md" />
+                </a>
                 {product.boughtLastMonth > 0 && (
                   <span className="text-slate-700">
                     {formatCount(product.boughtLastMonth)}+ bought in past month
@@ -163,6 +167,8 @@ export default async function ProductPage({ params }: Props) {
             ))}
           </div>
         </SectionCard>
+        <ReviewsSection productId={product.id} slug={product.slug} />
+        <QuestionsSection productId={product.id} slug={product.slug} />
         <ProductCarousel
           title="Customers who viewed this item also viewed"
           href={leaf ? `/c/${leaf.slug}` : undefined}
