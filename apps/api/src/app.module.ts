@@ -5,6 +5,7 @@ import { CatalogModule } from './modules/catalog/catalog.module';
 import { HealthModule } from './modules/health/health.module';
 import { HomeModule } from './modules/home/home.module';
 import { IdentityModule } from './modules/identity/identity.module';
+import { NotificationModule } from './modules/notification/notification.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { GlobalExceptionFilter } from './modules/shared/errors/global-exception.filter';
 import { IdempotencyInterceptor } from './modules/shared/idempotency/idempotency.interceptor';
@@ -23,6 +24,7 @@ import { SharedModule } from './modules/shared/shared.module';
     SearchModule,
     HomeModule,
     CartModule,
+    NotificationModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },

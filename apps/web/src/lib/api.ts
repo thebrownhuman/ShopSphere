@@ -35,6 +35,8 @@ export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   body?: unknown;
   accessToken?: string | null;
+  /** Extra headers, e.g. `idempotency-key`. */
+  headers?: Record<string, string>;
 }
 
 /**
@@ -42,7 +44,7 @@ export interface RequestOptions {
  * Throws ApiRequestError with the backend's `{code, message, details}`.
  */
 export async function apiRequest<T>(path: string, opts: RequestOptions = {}): Promise<T> {
-  const headers: Record<string, string> = { accept: 'application/json' };
+  const headers: Record<string, string> = { accept: 'application/json', ...opts.headers };
   if (opts.body !== undefined) headers['content-type'] = 'application/json';
   const csrf = readCookie('ss_csrf');
   if (csrf) headers['x-csrf-token'] = csrf;
