@@ -1,9 +1,18 @@
 import type { DeliveryZone } from '@shopsphere/types';
 
 /**
- * Delivery estimate v1 (M2.7): stub zone table on pincode prefixes. Replaced by courier
- * serviceability in M5.6a. All calendar math happens in IST (UTC+05:30, no DST).
+ * Delivery estimate (M2.7). Zone rules and SLA days come from the courier's serviceability
+ * matrix (M5.6a, refreshed nightly) when one has been fetched; the built-in table below is the
+ * fallback. All calendar math happens in IST (UTC+05:30, no DST).
  */
+
+/** Courier lane rules (subset of shipping's ServiceabilityMatrix). */
+export interface LaneRules {
+  metroPrefixes: string[];
+  remotePatterns: string[];
+  unserviceablePatterns: string[];
+  slaDays: Record<DeliveryZone, number>;
+}
 
 const IST_OFFSET_MS = 330 * 60 * 1000;
 
@@ -27,18 +36,28 @@ export function isValidPincode(pin: string): boolean {
   return /^[1-9]\d{5}$/.test(pin);
 }
 
-export function zoneFor(fromPin: string, toPin: string): DeliveryZone {
-  if (REMOTE_PREFIXES.some((r) => r.test(toPin))) return 'REMOTE';
+export function zoneFor(fromPin: string, toPin: string, lanes?: LaneRules): DeliveryZone {
+  const remote = lanes ? lanes.remotePatterns.map((p) => new RegExp(p)) : REMOTE_PREFIXES;
+  const metro = lanes ? new Set(lanes.metroPrefixes) : METRO_PREFIXES;
+  if (remote.some((r) => r.test(toPin))) return 'REMOTE';
   if (fromPin.slice(0, 3) === toPin.slice(0, 3)) return 'LOCAL';
   if (fromPin.slice(0, 2) === toPin.slice(0, 2)) return 'REGIONAL';
-  if (METRO_PREFIXES.has(fromPin.slice(0, 3)) && METRO_PREFIXES.has(toPin.slice(0, 3)))
-    return 'METRO';
+  if (metro.has(fromPin.slice(0, 3)) && metro.has(toPin.slice(0, 3))) return 'METRO';
   return 'NATIONAL';
 }
 
+/** False when the courier matrix excludes the destination (e.g. field post offices). */
+export function courierServes(toPin: string, lanes?: LaneRules): boolean {
+  return !lanes?.unserviceablePatterns.some((p) => new RegExp(p).test(toPin));
+}
+
 /** ShopSphere-fulfilled (Plus) ships a day faster except to remote zones. */
-export function slaDays(zone: DeliveryZone, fulfilledByShopSphere: boolean): number {
-  const base = ZONE_SLA_DAYS[zone];
+export function slaDays(
+  zone: DeliveryZone,
+  fulfilledByShopSphere: boolean,
+  lanes?: LaneRules,
+): number {
+  const base = lanes?.slaDays[zone] ?? ZONE_SLA_DAYS[zone];
   return fulfilledByShopSphere && zone !== 'REMOTE' ? Math.max(1, base - 1) : base;
 }
 
@@ -50,6 +69,8 @@ export interface EstimateInput {
   cutoffHour: number;
   pricePaise: number;
   now: Date;
+  /** Courier matrix; omitted = built-in table. */
+  lanes?: LaneRules;
 }
 
 export interface Estimate {
@@ -79,8 +100,8 @@ function istWeekday(t: number): number {
 }
 
 export function estimateDelivery(input: EstimateInput): Estimate {
-  const zone = zoneFor(input.fromPin, input.toPin);
-  const sla = slaDays(zone, input.fulfilledByShopSphere);
+  const zone = zoneFor(input.fromPin, input.toPin, input.lanes);
+  const sla = slaDays(zone, input.fulfilledByShopSphere, input.lanes);
   const now = input.now.getTime();
   let cutoff = istDayStart(now) + input.cutoffHour * 3_600_000;
   if (now >= cutoff) cutoff += DAY_MS;

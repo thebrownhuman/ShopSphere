@@ -57,6 +57,23 @@ export interface WebhookDelivery {
   createdAt: Date;
 }
 
+/** RazorpayX-style payout to a seller's bank account (M5.7). */
+export interface BankPayout {
+  id: string;
+  entity: 'payout';
+  amount: number;
+  currency: 'INR';
+  /** processed = credited; rejected = beneficiary account invalid. */
+  status: 'processed' | 'rejected';
+  mode: 'IMPS' | 'NEFT';
+  reference_id: string | null;
+  narration: string | null;
+  fund_account: { name: string; account_number: string; ifsc: string };
+  utr: string | null;
+  failure_reason: string | null;
+  created_at: number;
+}
+
 export class BankError extends Error {
   constructor(
     readonly status: number,
@@ -79,6 +96,7 @@ export class BankService implements OnModuleDestroy {
   readonly orders = new Map<string, BankOrder>();
   readonly payments = new Map<string, BankPayment>();
   readonly refunds = new Map<string, BankRefund>();
+  readonly payouts = new Map<string, BankPayout>();
   readonly deliveries: WebhookDelivery[] = [];
   private readonly idempotency = new Map<string, string>();
   private readonly timers = new Set<NodeJS.Timeout>();
@@ -87,6 +105,54 @@ export class BankService implements OnModuleDestroy {
 
   onModuleDestroy() {
     this.timers.forEach(clearTimeout);
+  }
+
+  /**
+   * Payout from the merchant's current account. Settles instantly in the simulator; an
+   * account number ending in 0000 is rejected (invalid beneficiary). Honours Idempotency-Key.
+   */
+  createPayout(input: Record<string, unknown>, idemKey?: string): BankPayout {
+    if (idemKey) {
+      const existing = this.idempotency.get(`payout:${idemKey}`);
+      if (existing) return this.payouts.get(existing)!;
+    }
+    if (!Number.isInteger(input.amount) || (input.amount as number) < 100) {
+      throw new BankError(400, 'amount must be an integer number of paise >= 100');
+    }
+    const fa = (input.fund_account ?? {}) as Record<string, unknown>;
+    const account = typeof fa.account_number === 'string' ? fa.account_number : '';
+    const ifsc = typeof fa.ifsc === 'string' ? fa.ifsc : '';
+    if (!/^\d{9,18}$/.test(account) || !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) {
+      throw new BankError(400, 'fund_account needs account_number (9-18 digits) and a valid ifsc');
+    }
+    const rejected = account.endsWith('0000');
+    const payout: BankPayout = {
+      id: id('pout'),
+      entity: 'payout',
+      amount: input.amount as number,
+      currency: 'INR',
+      status: rejected ? 'rejected' : 'processed',
+      mode: (input.amount as number) > 50_000_000 ? 'NEFT' : 'IMPS',
+      reference_id: typeof input.reference_id === 'string' ? input.reference_id.slice(0, 40) : null,
+      narration: typeof input.narration === 'string' ? input.narration.slice(0, 30) : null,
+      fund_account: {
+        name: typeof fa.name === 'string' ? fa.name : '',
+        account_number: account,
+        ifsc,
+      },
+      utr: rejected ? null : `SSBN${randomBytes(6).toString('hex').toUpperCase()}`,
+      failure_reason: rejected ? 'Beneficiary account is invalid' : null,
+      created_at: now(),
+    };
+    this.payouts.set(payout.id, payout);
+    if (idemKey) this.idempotency.set(`payout:${idemKey}`, payout.id);
+    return payout;
+  }
+
+  getPayout(payoutId: string): BankPayout {
+    const p = this.payouts.get(payoutId);
+    if (!p) throw new BankError(404, 'payout not found');
+    return p;
   }
 
   createOrder(

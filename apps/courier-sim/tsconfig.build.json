@@ -1,0 +1,6 @@
+{
+  "extends": "@shopsphere/config/tsconfig.node.json",
+  "compilerOptions": { "outDir": "dist", "rootDir": "src", "types": ["node"] },
+  "include": ["src"],
+  "exclude": ["src/**/*.spec.ts"]
+}

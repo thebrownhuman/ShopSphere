@@ -89,9 +89,9 @@ export interface NewOrder {
   }[];
 }
 
-interface TransitionMeta {
+export interface TransitionMeta {
   type: string;
-  actor: 'customer' | 'system' | 'payment' | 'admin';
+  actor: 'customer' | 'system' | 'payment' | 'admin' | 'seller' | 'courier';
   note?: string | null;
   /** Extra outbox payload fields (see OrderEventPayloads). */
   payload?: Record<string, unknown>;
@@ -103,6 +103,7 @@ export interface AfterCommit {
 }
 
 const n = (v: bigint | number) => Number(v);
+const SHIPPING_EVENTS = new Set(['order.shipped', 'order.out_for_delivery', 'order.delivered']);
 
 /** "OD" + yymmdd (UTC) + 10 random digits: unguessable enough for display, unique-indexed. */
 export function newOrderNumber(now = new Date()): string {
@@ -185,7 +186,7 @@ export class OrderService {
     });
     const type = eventTypeFor(to);
     await this.emit(tx, o, to, type, {
-      ...(type === 'order.status_changed' ? { fromStatus: from } : {}),
+      ...(type === 'order.status_changed' || SHIPPING_EVENTS.has(type) ? { fromStatus: from } : {}),
       ...meta.payload,
     });
     return { ...o, status: to };

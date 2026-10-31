@@ -3,13 +3,17 @@ import type { DeliveryEstimateResponse } from '@shopsphere/types';
 import { rankOffers } from '../catalog/product-loader';
 import { AppError } from '../shared/errors/app-error';
 import { PrismaService } from '../shared/prisma/prisma.service';
-import { estimateDelivery, isValidPincode } from './delivery-estimate';
+import { ServiceabilityService } from '../shipping/serviceability.service';
+import { courierServes, estimateDelivery, isValidPincode } from './delivery-estimate';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 @Injectable()
 export class DeliveryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly serviceability: ServiceabilityService,
+  ) {}
 
   async estimate(
     skuId: string,
@@ -21,9 +25,10 @@ export class DeliveryService {
     if (!isValidPincode(pincode)) {
       throw new AppError('INVALID_PINCODE', 'Enter a valid 6-digit pincode', 400);
     }
-    const [pin, offers] = await Promise.all([
+    const [pin, offers, lanes] = await Promise.all([
       this.prisma.pincode.findUnique({ where: { pincode } }),
       this.prisma.offer.findMany({ where: { skuId }, include: { seller: true } }),
+      this.serviceability.latest(),
     ]);
     const ranked = rankOffers(offers);
     const offer = offerId ? ranked.find((o) => o.id === offerId) : ranked[0];
@@ -36,7 +41,7 @@ export class DeliveryService {
     };
     // Unknown-but-valid pincodes are treated as serviceable in this simulation; only rows
     // explicitly marked unserviceable (islands, high-altitude) are refused.
-    if (!offer || pin?.serviceable === false) {
+    if (!offer || pin?.serviceable === false || !courierServes(pincode, lanes ?? undefined)) {
       if (!offer && offers.length === 0)
         throw new AppError('NOT_FOUND', 'SKU not found', HttpStatus.NOT_FOUND);
       return {
@@ -58,6 +63,7 @@ export class DeliveryService {
       cutoffHour: offer.seller.cutoffHour,
       pricePaise: Number(offer.price),
       now,
+      lanes: lanes ?? undefined,
     });
     return {
       ...base,
