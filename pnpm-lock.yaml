@@ -18,7 +18,54 @@ importers:
         specifier: 5.7.2
         version: 5.7.2
 
-  apps/admin: {}
+  apps/admin:
+    dependencies:
+      '@shopsphere/types':
+        specifier: workspace:*
+        version: link:../../packages/types
+      '@shopsphere/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      next:
+        specifier: 15.1.6
+        version: 15.1.6(@babel/core@7.29.7)(@opentelemetry/api@1.10.0)(@playwright/test@1.49.1)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+      react:
+        specifier: 19.0.0
+        version: 19.0.0
+      react-dom:
+        specifier: 19.0.0
+        version: 19.0.0(react@19.0.0)
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.49.1
+        version: 1.49.1
+      '@shopsphere/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@types/node':
+        specifier: 22.10.2
+        version: 22.10.2
+      '@types/react':
+        specifier: 19.0.2
+        version: 19.0.2
+      '@types/react-dom':
+        specifier: 19.0.2
+        version: 19.0.2(@types/react@19.0.2)
+      autoprefixer:
+        specifier: 10.4.20
+        version: 10.4.20(postcss@8.4.49)
+      eslint:
+        specifier: 9.17.0
+        version: 9.17.0(jiti@1.21.7)
+      postcss:
+        specifier: 8.4.49
+        version: 8.4.49
+      tailwindcss:
+        specifier: 3.4.17
+        version: 3.4.17(ts-node@10.9.2(@types/node@22.10.2)(typescript@5.7.2))
+      typescript:
+        specifier: 5.7.2
+        version: 5.7.2
 
   apps/api:
     dependencies:

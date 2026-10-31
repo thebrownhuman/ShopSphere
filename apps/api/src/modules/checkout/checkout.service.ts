@@ -23,6 +23,8 @@ import { CouponService } from '../coupon/coupon.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { PAY_WINDOW_MS, OrderService, type NewOrder } from '../order/order.service';
+import { PromotionsService } from '../promotions/promotions.service';
+import type { BankOfferPick } from '../promotions/bank-offer';
 import { ProviderRegistry } from '../payment/providers/provider.registry';
 import { resolveGstBp } from '../pricing/pricing';
 import { AppError } from '../shared/errors/app-error';
@@ -55,6 +57,8 @@ interface QuoteLine extends SplitLine {
   categoryIds: string[];
   sellerState: string;
   blocking: boolean;
+  /** M6.6 lightning deal priced into this line; claimed at place-order. */
+  dealId?: string;
 }
 
 export interface Quote {
@@ -64,6 +68,7 @@ export interface Quote {
   coupon: Coupon | null;
   couponLines: CouponLine[];
   address: CheckoutAddress | null;
+  bankOffer: BankOfferPick | null;
 }
 
 const n = (v: bigint | number) => Number(v);
@@ -94,6 +99,7 @@ export class CheckoutService {
     private readonly inventory: InventoryService,
     private readonly orders: OrderService,
     @Inject(ProviderRegistry) private readonly providers: ProviderRegistry,
+    private readonly promotions: PromotionsService,
   ) {}
 
   // ───────── Sessions ─────────
@@ -373,6 +379,21 @@ export class CheckoutService {
       });
     }
 
+    // Lightning deals (M6.6): live deal price replaces the offer price while units remain.
+    const deals = await this.promotions.liveDealsForOffers(
+      lines.filter((l) => l.offer && !l.blocking).map((l) => l.offer!.id),
+      now,
+    );
+    for (const l of lines) {
+      const deal = l.offer && !l.blocking ? deals.get(l.offer.id) : undefined;
+      if (!deal || deal.quantityCap - deal.claimedQty < l.item.qty) continue;
+      const unit = n(deal.dealPricePaise);
+      l.dealId = deal.id;
+      l.lineTotalPaise = unit * l.item.qty;
+      l.view.unitPricePaise = unit;
+      l.view.lineTotalPaise = unit * l.item.qty;
+    }
+
     // Coupon (M4.6) on the live lines.
     const couponLines: CouponLine[] = lines
       .filter((l) => !l.blocking)
@@ -416,7 +437,16 @@ export class CheckoutService {
     const deliveryPaise = shipments.reduce((a, x) => a + x.deliveryFeePaise, 0);
     const method = (s.paymentMethod as PaymentMethodChoice | null) ?? null;
     const codFee = method?.type === 'COD' ? COD_FEE_PAISE : 0;
-    const totalPaise = itemsPaise + deliveryPaise - couponDiscount + codFee;
+    // Bank offer (M6.6): only when paying online through its provider (ShopSphere Bank).
+    const bankOffer = s.useStoreBalance
+      ? null
+      : await this.promotions.bankOfferFor(
+          method?.type === 'ONLINE' ? method : null,
+          itemsPaise - couponDiscount,
+          now,
+        );
+    const bankDiscount = bankOffer?.discountPaise ?? 0;
+    const totalPaise = itemsPaise + deliveryPaise - couponDiscount - bankDiscount + codFee;
     const balance = n(await this.ledger.balance(s.userId));
     const storeBalancePaise = s.useStoreBalance ? Math.min(balance, totalPaise) : 0;
     const payablePaise = totalPaise - storeBalancePaise;
@@ -507,6 +537,7 @@ export class CheckoutService {
         ? { code: coupon.code, description: coupon.description, discountPaise: couponDiscount }
         : null,
       couponError,
+      bankOffer,
       storeBalance: { availablePaise: balance, applied: storeBalancePaise > 0 },
       paymentMethod: method,
       paymentOptions,
@@ -516,17 +547,18 @@ export class CheckoutService {
         mrpPaise,
         deliveryPaise,
         couponDiscountPaise: couponDiscount,
+        bankOfferDiscountPaise: bankDiscount,
         codFeePaise: codFee,
         totalPaise,
         storeBalancePaise,
         payablePaise,
         tax,
-        savingsPaise: mrpPaise - itemsPaise + couponDiscount,
+        savingsPaise: mrpPaise - itemsPaise + couponDiscount + bankDiscount,
       },
       issues,
       orderId: s.orderId,
     };
-    return { view, lines, shipments, coupon, couponLines, address };
+    return { view, lines, shipments, coupon, couponLines, address, bankOffer };
   }
 
   // ───────── Place order (M4.9) ─────────
@@ -628,7 +660,8 @@ export class CheckoutService {
         itemsPaise: t.itemsPaise,
         mrpPaise: t.mrpPaise,
         deliveryPaise: t.deliveryPaise,
-        couponDiscountPaise: t.couponDiscountPaise,
+        // Orders keep one discount column; the bank-offer share is in bank_offer_redemptions.
+        couponDiscountPaise: t.couponDiscountPaise + (t.bankOfferDiscountPaise ?? 0),
         codFeePaise: t.codFeePaise,
         totalPaise: t.totalPaise,
         storeBalancePaise: t.storeBalancePaise,
@@ -661,7 +694,9 @@ export class CheckoutService {
         offerId: l.offer!.id,
         skuId: l.item.skuId,
         qty: l.item.qty,
-        unitPricePaise: l.view.unitPricePaise,
+        // Deal lines are priced below the offer; the offer price is still what must not move
+        // (the deal itself is re-checked by the claim below).
+        unitPricePaise: l.dealId ? n(l.offer!.price) : l.view.unitPricePaise,
       })),
       payBy ?? new Date(Date.now() + PAY_WINDOW_MS),
     );
@@ -675,6 +710,10 @@ export class CheckoutService {
         t.couponDiscountPaise,
       );
     }
+    for (const l of q.lines) {
+      if (l.dealId) await this.promotions.claim(tx, order.id, l.dealId, l.item.qty);
+    }
+    if (q.bankOffer) await this.promotions.recordBankOffer(tx, order.id, q.bankOffer);
     if (t.storeBalancePaise > 0) {
       await this.ledger.debitForOrder(tx, s.userId, order.id, BigInt(t.storeBalancePaise));
     }

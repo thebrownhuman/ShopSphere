@@ -13,6 +13,7 @@
  * Every route needs `Authorization: Bearer <access token>` (guests sign in first, PRD §8 step 1).
  */
 
+import type { AppliedBankOffer } from './admin';
 import type { Paise } from './index';
 import type { OrderStatus } from './order';
 
@@ -159,6 +160,8 @@ export interface CheckoutTotals {
   mrpPaise: Paise;
   deliveryPaise: Paise;
   couponDiscountPaise: Paise;
+  /** M6.6 bank offer (ShopSphere Bank payments only); already deducted from totalPaise. */
+  bankOfferDiscountPaise?: Paise;
   codFeePaise: Paise;
   /** Order total incl. GST = items + delivery − coupon + COD fee. */
   totalPaise: Paise;
@@ -200,6 +203,8 @@ export interface CheckoutSession {
   coupon: AppliedCoupon | null;
   /** Set when the requested coupon could not be applied (it is then dropped). */
   couponError: { code: CouponErrorCode; message: string } | null;
+  /** M6.6: bank offer applied for the selected provider, if any. */
+  bankOffer?: AppliedBankOffer | null;
   storeBalance: { availablePaise: Paise; applied: boolean };
   paymentMethod: PaymentMethodChoice | null;
   paymentOptions: PaymentOption[];

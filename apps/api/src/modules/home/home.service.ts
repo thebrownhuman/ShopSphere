@@ -5,6 +5,7 @@ import { DiscoveryService } from '../catalog/discovery.service';
 import { imageSet } from '../catalog/media';
 import { ProductLoader } from '../catalog/product-loader';
 import type { Viewer } from '../catalog/viewer';
+import { PromotionsService } from '../promotions/promotions.service';
 import { OpenSearchClient } from '../search/opensearch.client';
 import { cardFromDoc, ProductDoc } from '../search/product-document';
 import { buildSearchBody, parseSearchParams } from '../search/search-query';
@@ -38,6 +39,8 @@ interface SectionData {
   limit?: number;
   seeAllHref?: string;
   categorySlugs?: string[];
+  /** DEAL_ROW fed by admin lightning deals (M6.6) instead of a search query. */
+  lightningDeals?: boolean;
 }
 
 const IST_OFFSET_MS = 330 * 60 * 1000;
@@ -67,6 +70,7 @@ export class HomeService {
     private readonly products: ProductLoader,
     private readonly discovery: DiscoveryService,
     private readonly categories: CategoryTreeService,
+    private readonly promotions: PromotionsService,
   ) {}
 
   async home(viewer: Viewer, now = new Date()): Promise<HomeResponse> {
@@ -140,6 +144,7 @@ export class HomeService {
         return cards.length ? { ...base, type, cards } : null;
       }
       case 'DEAL_ROW': {
+        if (d.lightningDeals) return this.lightningDealRow(base, d, now);
         const products = await this.query(
           d.query ?? { discount: '40', inStock: 'true' },
           d.limit ?? 12,
@@ -193,6 +198,48 @@ export class HomeService {
       default:
         return null;
     }
+  }
+
+  /** Live lightning deals: deal price on the card, real window end and real % claimed. */
+  private async lightningDealRow(
+    base: { id: string; title: string; position: number },
+    d: SectionData,
+    now: Date,
+  ): Promise<HomeSection | null> {
+    const deals = await this.promotions.liveDeals(now, d.limit ?? 12);
+    if (!deals.length) return null;
+    const cards = new Map(
+      (await this.products.cards([...new Set(deals.map((x) => x.productId))])).map((c) => [
+        c.productId,
+        c,
+      ]),
+    );
+    const items = deals.flatMap((deal) => {
+      const card = cards.get(deal.productId);
+      if (!card) return [];
+      const price = Number(deal.dealPricePaise);
+      const mrp = Math.max(card.pricing?.mrp ?? price, price);
+      return [
+        {
+          product: {
+            ...card,
+            title: deal.title,
+            pricing: card.pricing && {
+              ...card.pricing,
+              price,
+              mrp,
+              discountPercent: mrp > 0 ? Math.floor(((mrp - price) / mrp) * 100) : 0,
+              gstAmount: price - Math.round((price * 100) / (100 + card.pricing.gstRatePercent)),
+            },
+          },
+          endsAt: deal.endsAt.toISOString(),
+          claimedPercent: Math.min(100, Math.floor((deal.claimedQty * 100) / deal.quantityCap)),
+        },
+      ];
+    });
+    return items.length
+      ? { ...base, type: 'DEAL_ROW', deals: items, seeAllHref: d.seeAllHref ?? null }
+      : null;
   }
 
   private async quadCard(c: QuadCardSource, recent: ProductCard[]): Promise<QuadCard | null> {

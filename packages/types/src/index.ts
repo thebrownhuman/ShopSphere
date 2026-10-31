@@ -112,3 +112,6 @@ export * from './review';
 // ───────── Returns, support, push (M6) ─────────
 
 export * from './returns';
+// ───────── Admin console, promotions, home CMS (M6) ─────────
+
+export * from './admin';

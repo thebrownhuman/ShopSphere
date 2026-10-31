@@ -3,6 +3,7 @@ import type { Request } from 'express';
 import type { HomeResponse } from '@shopsphere/types';
 import { CatalogModule } from '../catalog/catalog.module';
 import { Req, ViewerResolver } from '../catalog/viewer';
+import { PromotionsModule } from '../promotions/promotions.module';
 import { SearchModule } from '../search/search.module';
 import { HomeService } from './home.service';
 
@@ -22,8 +23,9 @@ export class HomeController {
 }
 
 @Module({
-  imports: [CatalogModule, SearchModule],
+  imports: [CatalogModule, SearchModule, PromotionsModule],
   controllers: [HomeController],
   providers: [HomeService],
+  exports: [HomeService],
 })
 export class HomeModule {}

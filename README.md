@@ -148,3 +148,15 @@ Contract: `packages/types/src/seller.ts` (routes and error codes in the file hea
 DATABASE_URL=postgresql://shopsphere:shopsphere@localhost:5440/m5_seller corepack pnpm --filter @shopsphere/api test:int -- seller
 corepack pnpm --filter @shopsphere/seller test:e2e   # API 4210, portal 3130, storefront 3140
 ```
+
+## Admin console, promotions, home CMS (M6.5–M6.7)
+
+- `apps/admin` (port 3003): staff console. Roles SUPER_ADMIN / CATALOG / SUPPORT / FINANCE in
+  `staff_roles`, enforced by `StaffGuard`; every admin mutation audited. Seeded super-admin:
+  `ADMIN_SEED_EMAIL` / `ADMIN_SEED_PASSWORD` (`apps/api/.env.example`). See `apps/admin/README.md`.
+- API under `/admin/*` (`apps/api/src/modules/admin`), promotions in `modules/promotions`:
+  lightning deals (window, quantity cap claimed atomically at place-order, shown in home
+  `DEAL_ROW` sections with `dataSource.lightningDeals: true`) and bank offers (applied at checkout
+  only for ONLINE payments via the ShopSphere Bank provider; recorded in `bank_offer_redemptions`).
+- Home CMS: `/admin/home/sections` CRUD + reorder + `/admin/home/preview?at=&audience=`.
+- Migration `20261101100000_admin_promotions`.

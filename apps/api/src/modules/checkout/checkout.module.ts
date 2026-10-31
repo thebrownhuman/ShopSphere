@@ -5,6 +5,7 @@ import { IdentityModule } from '../identity/identity.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { LedgerModule } from '../ledger/ledger.module';
 import { OrderModule } from '../order/order.module';
+import { PromotionsModule } from '../promotions/promotions.module';
 import { PaymentModule } from '../payment/payment.module';
 import { CheckoutController } from './checkout.controller';
 import { CheckoutService } from './checkout.service';
@@ -19,6 +20,7 @@ import { CheckoutService } from './checkout.service';
     InventoryModule,
     OrderModule,
     PaymentModule,
+    PromotionsModule,
   ],
   controllers: [CheckoutController],
   providers: [CheckoutService],
