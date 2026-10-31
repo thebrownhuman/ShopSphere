@@ -12,6 +12,7 @@ import { useRequester } from '@/lib/use-requester';
 import { addressLine } from '../checkout/steps';
 import { PriceBreakdown } from '../checkout/price-breakdown';
 import { Modal } from '../modal';
+import { ReturnPanel } from './return-panel';
 import { STATUS_LABEL, timelineSteps } from './status';
 
 const REASONS = [
@@ -86,7 +87,10 @@ function CancelOrder({ order, onDone }: { order: OrderDetail; onDone: (o: OrderD
   );
 }
 
-/** M4.28 order detail: shipments with tracking timeline, invoice download, cancel (before SHIPPED). */
+/**
+ * M4.28 order detail: shipments with tracking timeline, invoice download, cancel (before SHIPPED),
+ * and returns (M6.1).
+ */
 export function OrderDetailView({ id }: { id: string }) {
   const { request, ready, needsSignIn } = useRequester();
   const api = useMemo(() => ordersApi(request), [request]);
@@ -181,6 +185,7 @@ export function OrderDetailView({ id }: { id: string }) {
         </div>
         <PriceBreakdown price={order.price} itemCount={itemCount} />
       </div>
+      <ReturnPanel orderId={order.id} orderStatus={order.status} />
       {order.shipments.map((sh, i) => (
         <section
           key={sh.id}

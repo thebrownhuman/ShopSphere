@@ -21,6 +21,8 @@ import type {
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { InternalTokenGuard } from '../payment/payment.controller';
+import { ReturnsService } from '../returns/returns.service';
+import { AppError } from '../shared/errors/app-error';
 import { SkipRateLimit } from '../shared/rate-limit/rate-limit.decorator';
 import { ServiceabilityService } from '../shipping/serviceability.service';
 import { FulfilmentService } from './fulfilment.service';
@@ -107,13 +109,22 @@ export class ShippingController {
   constructor(
     private readonly fulfilment: FulfilmentService,
     private readonly serviceability: ServiceabilityService,
+    private readonly returns: ReturnsService,
   ) {}
 
   @Post('webhooks/:provider')
   @HttpCode(200)
   @SkipRateLimit()
-  webhook(@Param('provider') provider: string, @Req() req: RawBodyRequest<Request>) {
-    return this.fulfilment.handleWebhook(provider, req.rawBody, req.headers);
+  async webhook(@Param('provider') provider: string, @Req() req: RawBodyRequest<Request>) {
+    try {
+      return await this.fulfilment.handleWebhook(provider, req.rawBody, req.headers);
+    } catch (err) {
+      // Reverse pickups (M6.1) share the courier's webhook URL; their AWBs are not shipments.
+      if (err instanceof AppError && err.code === 'NOT_FOUND') {
+        return this.returns.handleWebhook(provider, req.rawBody, req.headers);
+      }
+      throw err;
+    }
   }
 
   /** apps/workers: recover missed tracking webhooks. */

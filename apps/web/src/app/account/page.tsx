@@ -16,7 +16,12 @@ const TILES: { title: string; body: string; href?: string }[] = [
   { title: 'Wishlists', body: 'Items you saved for later' },
   { title: 'ShopSphere Plus', body: 'Membership benefits' },
   { title: 'Gift card balance', body: 'Add or view gift cards' },
-  { title: 'Notification preferences', body: 'Email, SMS and push' },
+  {
+    title: 'Notification preferences',
+    body: 'Email, SMS, WhatsApp and browser',
+    href: '/account/notifications',
+  },
+  { title: 'Help & support', body: 'Help articles and your support tickets', href: '/help' },
 ];
 
 /** "Your Account" hub. Tiles without a page yet arrive with their milestones. */

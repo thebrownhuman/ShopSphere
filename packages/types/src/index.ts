@@ -109,3 +109,6 @@ export * from './fulfilment';
 // ───────── Reviews, review summary, Q&A (M6.2–M6.4) ─────────
 
 export * from './review';
+// ───────── Returns, support, push (M6) ─────────
+
+export * from './returns';

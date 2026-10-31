@@ -29,6 +29,37 @@ in SQL through `docker exec shopsphere-postgres-1 psql`, override with `E2E_PSQL
 ```bash
 corepack pnpm --filter @shopsphere/web exec playwright test -c playwright.checkout-api.config.ts e2e/reviews.spec.ts
 ```
+## Milestone 6 returns, help centre, WhatsApp + web push
+
+Contract: `packages/types/src/returns.ts` (routes in the file header). Migration
+`20261101100000_returns_support_push` (`return_requests`, `return_tracking_events`,
+`support_tickets`, `push_subscriptions`).
+
+- Returns (M6.1, `apps/api/src/modules/returns`): order-level. `GET /orders/:id/return` gives
+  eligibility (DELIVERED, inside the shortest window of the order's top-level categories:
+  electronics/mobiles/books 7 days, fashion/home/other 10, grocery/beauty not returnable;
+  `return-policy.ts`), pickup days and refund targets. `POST /orders/:id/return` moves the order
+  `DELIVERED → RETURN_REQUESTED` and books a reverse pickup (customer → seller) through the active
+  `CourierProvider`. Courier webhooks share `POST /shipping/webhooks/:provider` (AWBs that are not
+  shipments are routed to returns): `SHIPPED` = picked up (order `→ PICKED_UP`), `DELIVERED` =
+  received by the seller. Duplicates/stragglers are recorded with `applied=false`.
+  Seller Central `/returns`: `GET /seller/returns`, `POST /seller/returns/:id/pickup` (re-book),
+  `POST /seller/returns/:id/qc` — PASS restocks, refunds and moves the order `→ REFUNDED`:
+  original method via `PaymentService.requestRefund` (store balance part back to the ledger), or the
+  whole amount instantly to ShopSphere Pay balance if the shopper chose it (COD orders: balance only).
+  The seller's settlement line is held (`RETURN_HOLD`) while the return is open and `REVERSED` on refund.
+- Help centre + support (M6.8): `GET /help/articles?q=`, `GET /help/articles/:slug` (static content
+  in `support/help-articles.ts`); `GET/POST /support/tickets` (optionally linked to an own order).
+  Web: `/help`, `/help/:slug`, `/help/contact`.
+- WhatsApp + web push (M6.9): notification channels gain `whatsapp` (simulated: Mailpit inbox
+  `wa-<digits>@whatsapp.shopsphere.test`) and web push (`web-push`, VAPID). Preferences add
+  `whatsapp` (opt-in, default off) and `push` per category. Set `VAPID_PUBLIC_KEY` /
+  `VAPID_PRIVATE_KEY` (`npx web-push generate-vapid-keys`) to enable push; the web app registers
+  `public/sw.js` from Account → Notifications (`/account/notifications`).
+
+Tests: `apps/api/src/modules/returns/return-policy.spec.ts`, `notification.spec.ts`,
+`apps/api/test/returns.int.spec.ts` (courier-sim + bank-sim in-process), and the Playwright E2E
+`corepack pnpm --filter @shopsphere/web test:e2e:returns` (ports 4237/4137/4537/3157).
 
 ## Milestone 5 fulfilment (seller queue, courier, settlement)
 

@@ -12,6 +12,7 @@ const NAV = [
   { href: '/listings/bulk', label: 'Bulk upload' },
   { href: '/inventory', label: 'Inventory & prices' },
   { href: '/orders', label: 'Orders' },
+  { href: '/returns', label: 'Returns' },
   { href: '/payouts', label: 'Payouts' },
   { href: '/questions', label: 'Customer questions' },
 ];

@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:e2e:catalog": "playwright test -c playwright.catalog.config.ts",
     "test:e2e:checkout": "playwright test -c playwright.checkout.config.ts",
-    "test:e2e:checkout-api": "playwright test -c playwright.checkout-api.config.ts"
+    "test:e2e:checkout-api": "playwright test -c playwright.checkout-api.config.ts",
+    "test:e2e:returns": "playwright test -c playwright.returns.config.ts"
   },
   "dependencies": {
     "@shopsphere/types": "workspace:*",

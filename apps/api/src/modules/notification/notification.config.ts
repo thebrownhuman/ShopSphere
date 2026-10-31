@@ -13,6 +13,10 @@ export const notificationEnvSchema = z.object({
   WEB_URL: z.string().url().default('http://localhost:3000'),
   /** Worker -> API calls (event feed, dispatch). */
   NOTIFICATION_INTERNAL_TOKEN: z.string().min(16).default('dev-internal-token-change-me'),
+  /** Web push (M6.9). Generate with `npx web-push generate-vapid-keys`; unset = push disabled. */
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  VAPID_SUBJECT: z.string().default('mailto:support@shopsphere.test'),
 });
 
 export type NotificationConfig = z.infer<typeof notificationEnvSchema>;
