@@ -84,5 +84,5 @@ Contract: `packages/types/src/seller.ts` (routes and error codes in the file hea
 
 ```bash
 DATABASE_URL=postgresql://shopsphere:shopsphere@localhost:5440/m5_seller corepack pnpm --filter @shopsphere/api test:int -- seller
-corepack pnpm --filter @shopsphere/seller test:e2e   # API 4230, portal 3130, storefront 3140
+corepack pnpm --filter @shopsphere/seller test:e2e   # API 4210, portal 3130, storefront 3140
 ```

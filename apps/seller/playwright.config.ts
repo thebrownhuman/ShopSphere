@@ -5,7 +5,7 @@ import { defineConfig, devices } from '@playwright/test';
  * database + search index so local data is untouched), the seller portal and the storefront.
  * Override E2E_DATABASE_URL / E2E_REDIS_URL / E2E_OPENSEARCH_URL if your compose ports differ.
  */
-const API_PORT = Number(process.env.E2E_SELLER_API_PORT ?? 4230);
+const API_PORT = Number(process.env.E2E_SELLER_API_PORT ?? 4210);
 const SELLER_PORT = Number(process.env.E2E_SELLER_PORT ?? 3130);
 const WEB_PORT = Number(process.env.E2E_SELLER_WEB_PORT ?? 3140);
 export const API_URL = `http://localhost:${API_PORT}`;

@@ -217,7 +217,7 @@ export interface SellerDashboard {
   orders: { total: number; byStatus: Record<string, number> };
   returns: { requested: number; completed: number };
   listings: { activeOffers: number; outOfStock: number };
-  /** Null until the settlement engine (M5.7) produces payout data. */
+  /** Settlement engine (M5.7) totals; null only if settlement data is unavailable. */
   payouts: { pendingPaise: Paise; paidPaise: Paise; lastPayoutAt: string | null } | null;
   daily: { date: string; salesPaise: Paise; orders: number }[];
 }

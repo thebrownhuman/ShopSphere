@@ -137,6 +137,10 @@ test('seller signs up, passes KYC, gets approved, lists a product that shows on 
   await invRow.getByRole('button', { name: 'Save' }).click();
   await expect(invRow.getByRole('button', { name: 'Save' })).toBeDisabled();
 
+  // Fulfilment routes accept the newly approved seller (seller_users link written on approval).
+  await page.getByRole('link', { name: 'Orders' }).click();
+  await expect(page.getByText('No orders in this view.')).toBeVisible();
+
   // Visible on the storefront.
   await page.goto(`${WEB_URL}/s?k=${encodeURIComponent(`Quillwick ${run}`)}`);
   await expect(page.getByRole('heading', { name: title }).first()).toBeVisible({ timeout: 60_000 });

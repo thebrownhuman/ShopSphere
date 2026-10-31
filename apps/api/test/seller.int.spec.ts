@@ -360,13 +360,13 @@ describe('seller central (integration, real Postgres + OpenSearch)', () => {
     expect(xlsx.body.code).toBe('UPLOAD_INVALID');
   });
 
-  it('dashboard summarises listings, with no payout data yet', async () => {
+  it('dashboard summarises listings, including payout totals', async () => {
     const res = await http().get('/seller/dashboard').set('Authorization', auth).expect(200);
     expect(res.body).toMatchObject({
       sales: { last30DaysPaise: 0 },
       orders: { total: 0 },
       listings: { activeOffers: 4, outOfStock: 0 },
-      payouts: null,
+      payouts: { pendingPaise: 0, paidPaise: 0, lastPayoutAt: null },
     });
   });
 });

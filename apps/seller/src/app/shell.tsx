@@ -11,6 +11,8 @@ const NAV = [
   { href: '/listings/new', label: 'Add a listing' },
   { href: '/listings/bulk', label: 'Bulk upload' },
   { href: '/inventory', label: 'Inventory & prices' },
+  { href: '/orders', label: 'Orders' },
+  { href: '/payouts', label: 'Payouts' },
 ];
 
 export function Shell({ children }: { children: ReactNode }) {
