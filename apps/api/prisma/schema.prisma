@@ -40,6 +40,7 @@ model AuditLog {
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([entityType, entityId], map: "idx_audit_logs_entity")
+  @@index([createdAt], map: "idx_audit_logs_created")
   @@map("audit_logs")
 }
 
@@ -1000,4 +1001,73 @@ model SellerMedia {
 
   @@index([sellerAccountId])
   @@map("seller_media")
+}
+
+// ───────── Admin + promotions (M6.5, M6.6) ─────────
+
+/// Staff RBAC. role = SUPER_ADMIN | CATALOG | SUPPORT | FINANCE.
+model StaffRole {
+  userId    String   @map("user_id") @db.Uuid
+  role      String
+  grantedBy String?  @map("granted_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@id([userId, role])
+  @@map("staff_roles")
+}
+
+/// Lightning deal (M6.6). claimed_qty <= quantity_cap is a CHECK constraint.
+model LightningDeal {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  offerId        String   @map("offer_id") @db.Uuid
+  skuId          String   @map("sku_id") @db.Uuid
+  productId      String   @map("product_id") @db.Uuid
+  title          String
+  dealPricePaise BigInt   @map("deal_price_paise")
+  quantityCap    Int      @map("quantity_cap")
+  claimedQty     Int      @default(0) @map("claimed_qty")
+  startsAt       DateTime @map("starts_at") @db.Timestamptz(6)
+  endsAt         DateTime @map("ends_at") @db.Timestamptz(6)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([active, startsAt, endsAt], map: "idx_lightning_deals_window")
+  @@index([offerId], map: "idx_lightning_deals_offer")
+  @@map("lightning_deals")
+}
+
+model DealClaim {
+  orderId   String   @map("order_id") @db.Uuid
+  dealId    String   @map("deal_id") @db.Uuid
+  qty       Int
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@id([orderId, dealId])
+  @@map("deal_claims")
+}
+
+/// Bank offer (M6.6): percent (basis points) off when paying via `provider`.
+model BankOffer {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title            String
+  provider         String   @default("bank")
+  percentBp        Int      @map("percent_bp")
+  maxDiscountPaise BigInt?  @map("max_discount_paise")
+  minOrderPaise    BigInt   @default(0) @map("min_order_paise")
+  startsAt         DateTime @map("starts_at") @db.Timestamptz(6)
+  endsAt           DateTime @map("ends_at") @db.Timestamptz(6)
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("bank_offers")
+}
+
+model BankOfferRedemption {
+  orderId     String   @id @map("order_id") @db.Uuid
+  bankOfferId String   @map("bank_offer_id") @db.Uuid
+  amountPaise BigInt   @map("amount_paise")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("bank_offer_redemptions")
 }

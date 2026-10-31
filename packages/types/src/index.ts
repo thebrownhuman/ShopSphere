@@ -105,3 +105,7 @@ export * from './seller';
 // ───────── Fulfilment, shipping, settlement (M5) ─────────
 
 export * from './fulfilment';
+
+// ───────── Admin console, promotions, home CMS (M6) ─────────
+
+export * from './admin';

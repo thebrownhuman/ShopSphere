@@ -2,5 +2,32 @@
   "name": "@shopsphere/admin",
   "version": "0.0.0",
   "private": true,
-  "description": "Placeholder: Admin console Next.js app, scaffolded in Milestone 6."
+  "description": "Admin console (M6.5-M6.7): RBAC staff tools, promotions builder, home-page CMS.",
+  "scripts": {
+    "dev": "next dev -p 3003",
+    "build": "next build",
+    "start": "next start -p 3003",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@shopsphere/types": "workspace:*",
+    "@shopsphere/ui": "workspace:*",
+    "next": "15.1.6",
+    "react": "19.0.0",
+    "react-dom": "19.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.49.1",
+    "@shopsphere/config": "workspace:*",
+    "@types/node": "22.10.2",
+    "@types/react": "19.0.2",
+    "@types/react-dom": "19.0.2",
+    "autoprefixer": "10.4.20",
+    "eslint": "9.17.0",
+    "postcss": "8.4.49",
+    "tailwindcss": "3.4.17",
+    "typescript": "5.7.2"
+  }
 }
