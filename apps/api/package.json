@@ -27,7 +27,9 @@
     "@node-rs/argon2": "2.0.2",
     "@prisma/client": "5.22.0",
     "@shopsphere/types": "workspace:*",
+    "body-parser": "1.20.3",
     "cookie-parser": "1.4.7",
+    "exceljs": "4.4.0",
     "ioredis": "5.4.2",
     "jsonwebtoken": "9.0.2",
     "nodemailer": "6.9.16",
@@ -39,6 +41,7 @@
   "devDependencies": {
     "@nestjs/testing": "10.4.15",
     "@shopsphere/config": "workspace:*",
+    "@types/body-parser": "1.19.6",
     "@types/cookie-parser": "1.4.8",
     "@types/express": "4.17.21",
     "@types/jest": "29.5.14",

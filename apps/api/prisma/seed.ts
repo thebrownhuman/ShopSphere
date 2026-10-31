@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { PrismaClient } from '@prisma/client';
 import { seedCatalog } from './seed-catalog';
+import { seedSellers } from './seed-seller';
 
 /** Sample pincode directory (M1.8). A full India Post dataset can be imported later. */
 const PINCODES: [string, string, string, boolean][] = [
@@ -39,6 +40,7 @@ async function main() {
       products: Number(process.env.SEED_PRODUCTS ?? 5000),
       reset,
     });
+    await seedSellers(prisma);
     if (seeded || process.env.SEED_REINDEX === '1') await reindexSearch();
     await prisma.auditLog.create({
       data: {
