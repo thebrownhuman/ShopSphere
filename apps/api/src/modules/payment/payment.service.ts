@@ -1,5 +1,6 @@
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 import { AppError } from '../shared/errors/app-error';
 import {
   AttemptStatus,
@@ -38,6 +39,9 @@ const SETTLED: AttemptStatus[] = [
   'REFUND_ON_CAPTURE',
 ];
 
+/** Provider order ids of test-toggle payments; reconciliation never polls a gateway for them. */
+const SIMULATED_PREFIX = 'sim_';
+
 const isUniqueViolation = (err: unknown) => (err as { code?: string })?.code === 'P2002';
 
 /** JSON-safe copy (bigint -> number; paise fit in a safe integer). */
@@ -66,9 +70,17 @@ export class PaymentService {
     providerName: string,
     idempotencyKey: string,
     callbackUrl: string,
+    callerUserId?: string,
   ) {
     const order = await this.orders.getPayableOrder(orderId);
     if (!order) throw new AppError('ORDER_NOT_FOUND', 'Order not found', HttpStatus.NOT_FOUND);
+    if (order.userId !== undefined) {
+      if (!callerUserId)
+        throw new AppError('UNAUTHORIZED', 'Sign in required', HttpStatus.UNAUTHORIZED);
+      if (callerUserId !== order.userId) {
+        throw new AppError('ORDER_NOT_FOUND', 'Order not found', HttpStatus.NOT_FOUND);
+      }
+    }
     if (order.status !== 'PENDING_PAYMENT') {
       throw new AppError('ORDER_NOT_PAYABLE', `Order is ${order.status}`, HttpStatus.CONFLICT);
     }
@@ -289,6 +301,7 @@ export class PaymentService {
     const windowStart = new Date(now.getTime() - RECONCILE_WINDOW_MS);
 
     for (const payment of await this.repo.listOpenPayments(windowStart)) {
+      if (payment.providerOrderId.startsWith(SIMULATED_PREFIX)) continue;
       summary.checked += 1;
       try {
         const provider = this.providers.get(payment.provider);
@@ -332,6 +345,50 @@ export class PaymentService {
       summary.refundsRetried += 1;
     }
     return summary;
+  }
+
+  /**
+   * M4.36 staging/QA toggle: records a gateway payment that never touched a gateway and applies
+   * the requested outcome through the normal event path (so outbox, first-capture-wins and the
+   * order transitions behave exactly as for a real webhook). Disabled in production by config.
+   */
+  async simulate(orderId: string, outcome: 'success' | 'failure' | 'pending') {
+    const order = await this.orders.getPayableOrder(orderId);
+    if (!order) throw new AppError('ORDER_NOT_FOUND', 'Order not found', HttpStatus.NOT_FOUND);
+    const id = randomUUID().replace(/-/g, '').slice(0, 14);
+    const payment = await this.repo.createPayment({
+      orderId,
+      provider: 'bank',
+      providerOrderId: `${SIMULATED_PREFIX}order_${id}`,
+      amount: order.amountPaise,
+      currency: order.currency,
+      status: 'CREATED',
+    });
+    const status =
+      outcome === 'success' ? 'captured' : outcome === 'failure' ? 'failed' : 'authorized';
+    const gp: GatewayPayment = {
+      providerPaymentId: `${SIMULATED_PREFIX}pay_${id}`,
+      providerOrderId: payment.providerOrderId,
+      amountPaise: order.amountPaise,
+      currency: order.currency,
+      status,
+      method: 'test',
+      errorReason: outcome === 'failure' ? 'Simulated failure (test toggle)' : null,
+    };
+    const event: PaymentEvent = {
+      eventId: `sim:${gp.providerPaymentId}:${status}`,
+      type: `payment.${status}` as PaymentEvent['type'],
+      payment: gp,
+    };
+    const result = await this.applyEvent('bank', event, {
+      source: 'test-toggle',
+      payment: jsonSafe(gp),
+    });
+    return {
+      paymentId: payment.id,
+      providerPaymentId: gp.providerPaymentId,
+      outcome: result.outcome,
+    };
   }
 
   private async applyEvent(provider: ProviderName, event: NormalizedEvent, payload: unknown) {

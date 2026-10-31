@@ -13,7 +13,9 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
-    "test:int": "prisma generate && jest --testPathPattern \"\\.int\\.spec\\.ts$\" --testPathIgnorePatterns \"/node_modules/\""
+    "test:int": "prisma generate && jest --testPathPattern \"\\.int\\.spec\\.ts$\" --testPathIgnorePatterns \"/node_modules/\"",
+    "k6:setup": "ts-node --transpile-only scripts/k6-oversell.ts setup",
+    "k6:verify": "ts-node --transpile-only scripts/k6-oversell.ts verify"
   },
   "prisma": {
     "seed": "ts-node --transpile-only prisma/seed.ts"

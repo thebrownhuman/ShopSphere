@@ -21,10 +21,13 @@ export const paymentEnvSchema = z
     /** Worker -> API internal calls (reconcile) and manual refunds until admin RBAC lands. */
     PAYMENT_INTERNAL_TOKEN: z.string().min(16).default('dev-internal-token-change-me'),
     PAYMENT_DEV_ROUTES: bool.optional(),
+    /** M4.36 QA toggle (forced payment outcomes). Never honoured when NODE_ENV=production. */
+    PAYMENT_TEST_TOGGLE: bool.optional(),
   })
   .transform((env) => ({
     ...env,
     devRoutes: env.PAYMENT_DEV_ROUTES ?? env.NODE_ENV !== 'production',
+    testToggle: env.NODE_ENV !== 'production' && (env.PAYMENT_TEST_TOGGLE ?? true),
     razorpay:
       env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET && env.RAZORPAY_WEBHOOK_SECRET
         ? {

@@ -574,3 +574,271 @@ model WishlistItem {
   @@unique([wishlistId, skuId])
   @@map("wishlist_items")
 }
+
+// ---------------------------------------------------------------------------
+// Checkout, orders, inventory, coupons, ledger (M4). Owned by src/modules/{checkout,order,
+// inventory,coupon,ledger}. Status columns are TEXT; allowed values live in the modules.
+// Catalog/user ids are plain columns (snapshots survive catalog edits).
+// ---------------------------------------------------------------------------
+
+/// 30-minute checkout (cart snapshot or Buy Now item) the shopper edits before placing.
+model CheckoutSession {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  /// CART | BUY_NOW
+  source          String
+  cartId          String?  @map("cart_id") @db.Uuid
+  /// [{skuId, sellerId, qty, priceSnapshot}]
+  items           Json
+  addressId       String?  @map("address_id") @db.Uuid
+  /// [{shipmentKey, type, slotDate?}]
+  deliveryChoices Json     @default("[]") @map("delivery_choices")
+  /// {type: ONLINE, provider} | {type: COD} | null
+  paymentMethod   Json?    @map("payment_method")
+  couponCode      String?  @map("coupon_code")
+  useStoreBalance Boolean  @default(false) @map("use_store_balance")
+  /// Total the shopper was last shown.
+  quotedTotal     BigInt?  @map("quoted_total")
+  /// OPEN | PLACED | EXPIRED
+  status          String   @default("OPEN")
+  orderId         String?  @unique @map("order_id") @db.Uuid
+  expiresAt       DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([userId, createdAt])
+  @@map("checkout_sessions")
+}
+
+model Order {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  number              String    @unique
+  userId              String    @map("user_id") @db.Uuid
+  checkoutId          String    @unique @map("checkout_id") @db.Uuid
+  idempotencyKey      String    @map("idempotency_key")
+  status              String
+  /// ONLINE | COD | STORE_BALANCE
+  paymentMethod       String    @map("payment_method")
+  /// Preferred gateway for ONLINE (razorpay | bank).
+  paymentProvider     String?   @map("payment_provider")
+  itemsPaise          BigInt    @map("items_paise")
+  mrpPaise            BigInt    @map("mrp_paise")
+  deliveryPaise       BigInt    @map("delivery_paise")
+  couponDiscountPaise BigInt    @map("coupon_discount_paise")
+  codFeePaise         BigInt    @map("cod_fee_paise")
+  totalPaise          BigInt    @map("total_paise")
+  storeBalancePaise   BigInt    @map("store_balance_paise")
+  payablePaise        BigInt    @map("payable_paise")
+  cgstPaise           BigInt    @map("cgst_paise")
+  sgstPaise           BigInt    @map("sgst_paise")
+  igstPaise           BigInt    @map("igst_paise")
+  couponId            String?   @map("coupon_id") @db.Uuid
+  couponCode          String?   @map("coupon_code")
+  /// Address snapshot (CheckoutAddress).
+  address             Json
+  shipToState         String    @map("ship_to_state")
+  source              String
+  cartId              String?   @map("cart_id") @db.Uuid
+  /// Online payment deadline; reservations expire with it (15 min, 30 while a payment is pending).
+  payBy               DateTime? @map("pay_by") @db.Timestamptz(6)
+  cancelReason        String?   @map("cancel_reason")
+  placedAt            DateTime  @default(now()) @map("placed_at") @db.Timestamptz(6)
+  confirmedAt         DateTime? @map("confirmed_at") @db.Timestamptz(6)
+  cancelledAt         DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  shipments    Shipment[]
+  items        OrderItem[]
+  events       OrderEventRow[]
+  reservations InventoryReservation[]
+
+  @@unique([userId, idempotencyKey], map: "uq_orders_user_idempotency")
+  @@index([userId, placedAt], map: "idx_orders_user_placed")
+  @@index([status, payBy], map: "idx_orders_status_pay_by")
+  @@map("orders")
+}
+
+/// One package per seller/warehouse (M4.5).
+model Shipment {
+  id                    String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId               String      @map("order_id") @db.Uuid
+  sellerId              String      @map("seller_id") @db.Uuid
+  sellerName            String      @map("seller_name")
+  sellerState           String      @map("seller_state")
+  fulfilledByShopSphere Boolean     @map("fulfilled_by_shopsphere")
+  deliveryOption        String      @map("delivery_option")
+  deliveryFeePaise      BigInt      @map("delivery_fee_paise")
+  promisedDate          String      @map("promised_date")
+  status                String      @default("PENDING")
+  createdAt             DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  order                 Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  items                 OrderItem[]
+
+  @@index([orderId])
+  @@index([sellerId])
+  @@map("shipments")
+}
+
+model OrderItem {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId        String   @map("order_id") @db.Uuid
+  shipmentId     String   @map("shipment_id") @db.Uuid
+  productId      String   @map("product_id") @db.Uuid
+  skuId          String   @map("sku_id") @db.Uuid
+  offerId        String   @map("offer_id") @db.Uuid
+  sellerId       String   @map("seller_id") @db.Uuid
+  slug           String
+  title          String
+  variant        String?
+  imageUrl       String?  @map("image_url")
+  qty            Int
+  unitPricePaise BigInt   @map("unit_price_paise")
+  mrpPaise       BigInt   @map("mrp_paise")
+  lineTotalPaise BigInt   @map("line_total_paise")
+  discountPaise  BigInt   @map("discount_paise")
+  gstRateBp      Int      @map("gst_rate_bp")
+  taxablePaise   BigInt   @map("taxable_paise")
+  cgstPaise      BigInt   @map("cgst_paise")
+  sgstPaise      BigInt   @map("sgst_paise")
+  igstPaise      BigInt   @map("igst_paise")
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  shipment       Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([skuId])
+  @@map("order_items")
+}
+
+/// Order status history (M4.27); drives the tracking timeline.
+model OrderEventRow {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId    String   @map("order_id") @db.Uuid
+  fromStatus String?  @map("from_status")
+  toStatus   String   @map("to_status")
+  type       String
+  note       String?
+  actor      String
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@map("order_events")
+}
+
+/// Soft stock hold (M4.1): offers.reserved_qty is incremented atomically while ACTIVE.
+model InventoryReservation {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId   String   @map("order_id") @db.Uuid
+  offerId   String   @map("offer_id") @db.Uuid
+  skuId     String   @map("sku_id") @db.Uuid
+  qty       Int
+  /// ACTIVE | CONSUMED | RELEASED
+  status    String   @default("ACTIVE")
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([status, expiresAt], map: "idx_inventory_reservations_active")
+  @@map("inventory_reservations")
+}
+
+/// Coupon engine v1 (M4.6). value = paise (FLAT) or basis points (PERCENT).
+model Coupon {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code             String   @unique
+  description      String   @default("")
+  /// FLAT | PERCENT
+  type             String
+  value            BigInt
+  minOrderPaise    BigInt   @default(0) @map("min_order_paise")
+  maxDiscountPaise BigInt?  @map("max_discount_paise")
+  perUserLimit     Int      @default(1) @map("per_user_limit")
+  totalLimit       Int?     @map("total_limit")
+  usedCount        Int      @default(0) @map("used_count")
+  /// Empty = all categories (matches any ancestor category).
+  categoryIds      String[] @default([]) @map("category_ids")
+  sellerIds        String[] @default([]) @map("seller_ids")
+  startsAt         DateTime @map("starts_at") @db.Timestamptz(6)
+  endsAt           DateTime @map("ends_at") @db.Timestamptz(6)
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("coupons")
+}
+
+/// HELD at place-order, USED on confirm, RELEASED on cancel / payment expiry.
+model CouponRedemption {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  couponId    String   @map("coupon_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  orderId     String   @unique @map("order_id") @db.Uuid
+  amountPaise BigInt   @map("amount_paise")
+  status      String
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([couponId, userId])
+  @@map("coupon_redemptions")
+}
+
+/// Closed-loop ledger accounts (M4.7). USER accounts can't go negative (CHECK in SQL).
+model LedgerAccount {
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// USER | SYSTEM
+  ownerType    String        @map("owner_type")
+  ownerId      String        @map("owner_id")
+  /// STORE_BALANCE | GIFT_CARD_FLOAT | ORDER_CLEARING
+  kind         String
+  balancePaise BigInt        @default(0) @map("balance_paise")
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  entries      LedgerEntry[]
+
+  @@unique([ownerType, ownerId, kind], map: "uq_ledger_accounts_owner_kind")
+  @@map("ledger_accounts")
+}
+
+/// One balanced posting group; `key` makes each business event post at most once.
+model LedgerTransaction {
+  id        String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key       String        @unique
+  kind      String
+  reference String?
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  entries   LedgerEntry[]
+
+  @@map("ledger_transactions")
+}
+
+/// Double entry: entries of one transaction sum to zero. Positive = credit to the account.
+model LedgerEntry {
+  id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  transactionId String            @map("transaction_id") @db.Uuid
+  accountId     String            @map("account_id") @db.Uuid
+  amountPaise   BigInt            @map("amount_paise")
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  transaction   LedgerTransaction @relation(fields: [transactionId], references: [id])
+  account       LedgerAccount     @relation(fields: [accountId], references: [id])
+
+  @@index([accountId, createdAt])
+  @@index([transactionId])
+  @@map("ledger_entries")
+}
+
+/// Closed-loop gift cards: redeemed into the user's store balance; no cash-out or transfer.
+model GiftCard {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// sha256 of the normalised code; the code itself is never stored.
+  codeHash    String    @unique @map("code_hash")
+  last4       String
+  amountPaise BigInt    @map("amount_paise")
+  /// ACTIVE | REDEEMED | VOID
+  status      String    @default("ACTIVE")
+  redeemedBy  String?   @map("redeemed_by") @db.Uuid
+  redeemedAt  DateTime? @map("redeemed_at") @db.Timestamptz(6)
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("gift_cards")
+}

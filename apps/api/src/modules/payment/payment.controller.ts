@@ -23,7 +23,8 @@ import { AppError } from '../shared/errors/app-error';
 import { Idempotent, IDEMPOTENCY_HEADER } from '../shared/idempotency/idempotency.interceptor';
 import { SkipRateLimit } from '../shared/rate-limit/rate-limit.decorator';
 import { PROVIDERS } from './domain/payment.types';
-import { PAYABLE_ORDER_SOURCE, StubOrderSource } from './orders/payable-order-source';
+import { SessionService } from '../identity/tokens/session.service';
+import { StubOrderSource } from './orders/payable-order-source';
 import { PAYMENT_CONFIG, PaymentConfig } from './payment.config';
 import { PaymentService } from './payment.service';
 import { ProviderRegistry } from './providers/provider.registry';
@@ -43,14 +44,17 @@ const verifySchema = z.object({
   signature: z.string().min(1).max(256),
 });
 
-const refundSchema = z.object({
-  amountPaise: z.number().int().positive(),
-});
-
 const devOrderSchema = z.object({
-  orderId: orderIdSchema.optional(),
+  orderId: z
+    .string()
+    .regex(/^dev_[A-Za-z0-9_-]{1,60}$/)
+    .optional(),
   amountPaise: z.number().int().min(100).max(50_000_000),
   status: z.enum(['PENDING_PAYMENT', 'CONFIRMED', 'CANCELLED']).optional(),
+});
+
+const refundSchema = z.object({
+  amountPaise: z.number().int().positive(),
 });
 
 function parse<T>(schema: z.ZodType<T>, value: unknown): T {
@@ -89,21 +93,29 @@ export class PaymentController {
     private readonly payments: PaymentService,
     private readonly providers: ProviderRegistry,
     private readonly config: AppConfig,
+    private readonly sessions: SessionService,
     @Inject(PAYMENT_CONFIG) private readonly cfg: PaymentConfig,
-    @Inject(PAYABLE_ORDER_SOURCE) private readonly orders: StubOrderSource,
+    private readonly devOrders: StubOrderSource,
   ) {}
+
+  /** Optional caller: initiate checks ownership for orders that have an owner. */
+  private async caller(req: Request): Promise<string | undefined> {
+    const [scheme, token] = (req.header('authorization') ?? '').split(' ');
+    if (scheme !== 'Bearer' || !token) return undefined;
+    return (await this.sessions.authenticate(token)).sub;
+  }
 
   @Get('providers')
   providerList() {
     return { providers: this.providers.available() };
   }
 
-  /** Dev-only: register a stub order until the orders module exists. */
+  /** Dev-only gateway playground (apps/web /dev/pay): in-memory `dev_` orders, no catalog. */
   @Post('dev/orders')
   devOrder(@Body() body: unknown) {
     if (!this.cfg.devRoutes) throw new AppError('NOT_FOUND', 'Not found', HttpStatus.NOT_FOUND);
     const input = parse(devOrderSchema, body);
-    const order = this.orders.register(
+    const order = this.devOrders.register(
       input.orderId ?? `dev_${randomUUID().replace(/-/g, '').slice(0, 16)}`,
       BigInt(input.amountPaise),
       input.status,
@@ -113,10 +125,11 @@ export class PaymentController {
 
   @Post(':orderId/initiate')
   @Idempotent()
-  initiate(
+  async initiate(
     @Param('orderId') orderId: string,
     @Body() body: unknown,
     @Headers(IDEMPOTENCY_HEADER) key: string,
+    @Req() req: Request,
   ) {
     const input = parse(initiateSchema, body);
     const allowed = this.config.get('CORS_ORIGINS').split(',');
@@ -128,6 +141,7 @@ export class PaymentController {
       input.provider,
       key,
       input.returnUrl,
+      await this.caller(req),
     );
   }
 
