@@ -11,6 +11,7 @@ import { AppModule } from '../src/app.module';
 import { CategoryTreeService } from '../src/modules/catalog/category-tree.service';
 import { SessionService } from '../src/modules/identity/tokens/session.service';
 import { LedgerService } from '../src/modules/ledger/ledger.service';
+import { InvoiceStore } from '../src/modules/order/invoice.store';
 import { OrderWorker } from '../src/modules/order/order.worker';
 import { PaymentEventsConsumer } from '../src/modules/order/payment-events.consumer';
 import { BankProvider } from '../src/modules/payment/providers/bank.provider';
@@ -708,5 +709,227 @@ describe('checkout, orders and payments (integration, real Postgres)', () => {
     expect(page2.body).toMatchObject({ items: [{ id: ids[0] }], nextCursor: null });
     const none = await http().get('/orders?status=CANCELLED').set('authorization', user.auth);
     expect(none.body.items).toEqual([]);
+  });
+
+  // ───────── Gap fixes (M4/M6 follow-ups) ─────────
+
+  const cartWith = async (user: { auth: string }, skus: string[]) => {
+    for (const sku of skus) {
+      const r = await http()
+        .post('/cart/items')
+        .set('authorization', user.auth)
+        .set('content-type', 'application/json')
+        .send({ sku, qty: 1 });
+      expect(r.status).toBe(201);
+    }
+  };
+
+  it('order.confirmed carries invoice data; invoice link is signed and owner-only', async () => {
+    const user = await newUser();
+    const p = await newOffer({ stock: 3, seller: sellerMH });
+    const { orderId } = (await place(user, await buyNow(user, p.skuId, { type: 'COD' }))).body;
+    const confirmed = (await outbox(orderId)).find((e) => e.eventType === 'order.confirmed')!;
+    const payload = confirmed.payload as {
+      billingAddress: { pincode: string };
+      shipments: {
+        shipmentId: string;
+        sellerGstin: string;
+        sellerAddress: string;
+        deliveryFeePaise: number;
+        invoiceNumber: string;
+        invoiceKey: string;
+        items: { hsnCode: string }[];
+      }[];
+    };
+    expect(payload.billingAddress.pincode).toBe('560034');
+    const sh = payload.shipments[0];
+    expect(sh.sellerGstin).toMatch(/^27[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/);
+    expect(sh.sellerAddress).toContain('Maharashtra - 400001');
+    expect(typeof sh.deliveryFeePaise).toBe('number');
+    expect(sh.items[0].hsnCode).toMatch(/^\d{4}$/);
+    expect(sh.invoiceKey).toBe(`${orderId}/${sh.shipmentId}.pdf`);
+
+    const d = await http().get(`/orders/${orderId}`).set('authorization', user.auth);
+    expect(d.body.shipments[0].invoiceAvailable).toBe(true);
+
+    const store = app.get(InvoiceStore);
+    const spy = jest
+      .spyOn(store, 'signedUrl')
+      .mockResolvedValueOnce('http://s3.test/invoices/x.pdf?X-Amz-Signature=abc')
+      .mockResolvedValueOnce(null);
+    const url = `/orders/${orderId}/shipments/${sh.shipmentId}/invoice`;
+    const ok = await http().get(url).set('authorization', user.auth);
+    expect(ok.status).toBe(200);
+    expect(ok.body).toMatchObject({
+      number: sh.invoiceNumber,
+      url: expect.stringContaining('X-Amz-Signature'),
+    });
+    expect(spy).toHaveBeenCalledWith(sh.invoiceKey, sh.invoiceNumber, 300);
+    const notYet = await http().get(url).set('authorization', user.auth);
+    expect(notYet.body.code).toBe('INVOICE_NOT_READY');
+    const stranger = await newUser();
+    const other = await http().get(url).set('authorization', stranger.auth);
+    expect(other.body.code).toBe('ORDER_NOT_FOUND');
+    spy.mockRestore();
+  });
+
+  it('order list has slug, delivery date and years; status has number + failure reason', async () => {
+    const user = await newUser();
+    const p = await newOffer({ stock: 3 });
+    await place(user, await buyNow(user, p.skuId, { type: 'COD' }));
+    const list = await http().get('/orders').set('authorization', user.auth);
+    expect(list.body.years).toEqual([new Date().getUTCFullYear()]);
+    expect(list.body.items[0].previews[0]).toMatchObject({
+      slug: expect.stringMatching(/^m4-/),
+      expectedDeliveryDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      deliveredAt: null,
+    });
+
+    const s = await buyNow(user, p.skuId, { type: 'ONLINE', provider: 'bank' });
+    const placed = (await place(user, s)).body;
+    const gw = await initiate(user, placed.orderId);
+    const fail = { id: `pay_${run}_gf`, orderId: gw.providerOrderId, amount: gw.amountPaise };
+    await webhook('payment.failed', fail, `evt_${placed.orderId}_gf`);
+    await consumer.drain();
+    const st = await http().get(`/orders/${placed.orderId}/status`).set('authorization', user.auth);
+    expect(st.body).toMatchObject({
+      orderNumber: placed.orderNumber,
+      failureReason: 'Declined by bank',
+    });
+  });
+
+  it('PATCH /checkout removeLines drops lines from the session, not the cart', async () => {
+    const user = await newUser();
+    const a = await newOffer({ stock: 3 });
+    const b = await newOffer({ stock: 3, seller: sellerMH });
+    await cartWith(user, [a.skuId, b.skuId]);
+    const created = await http()
+      .post('/checkout')
+      .set('authorization', user.auth)
+      .send({ source: 'CART' });
+    const patched = await http()
+      .patch(`/checkout/${created.body.id}`)
+      .set('authorization', user.auth)
+      .send({ removeLines: [{ skuId: b.skuId, sellerId: sellerMH }] });
+    expect(patched.status).toBe(200);
+    const skus = patched.body.shipments.flatMap((x: { lines: { skuId: string }[] }) =>
+      x.lines.map((l) => l.skuId),
+    );
+    expect(skus).toEqual([a.skuId]);
+    const cart = await prisma.cart.findFirstOrThrow({
+      where: { userId: user.id },
+      include: { items: true },
+    });
+    expect(cart.items).toHaveLength(2);
+    const all = await http()
+      .patch(`/checkout/${created.body.id}`)
+      .set('authorization', user.auth)
+      .send({ removeLines: [{ skuId: a.skuId, sellerId: sellerKA }] });
+    expect(all.status).toBe(422);
+    expect(all.body.code).toBe('CHECKOUT_INVALID');
+  });
+
+  it('lightning deal claims are released on cancel and payment expiry, not twice', async () => {
+    const user = await newUser();
+    const p = await newOffer({ stock: 10, price: 118_000 });
+    const deal = await prisma.lightningDeal.create({
+      data: {
+        offerId: p.offerId,
+        skuId: p.skuId,
+        productId: p.productId,
+        title: 'Deal',
+        dealPricePaise: 99_000n,
+        quantityCap: 2,
+        startsAt: new Date(Date.now() - 60_000),
+        endsAt: new Date(Date.now() + 3_600_000),
+      },
+    });
+    const claimed = async () =>
+      (await prisma.lightningDeal.findUniqueOrThrow({ where: { id: deal.id } })).claimedQty;
+
+    const cod = (await place(user, await buyNow(user, p.skuId, { type: 'COD' }))).body;
+    expect(cod.totalPaise).toBeLessThan(118_000);
+    expect(await claimed()).toBe(1);
+    await http()
+      .post(`/orders/${cod.orderId}/cancel`)
+      .set('authorization', user.auth)
+      .send({})
+      .expect(200);
+    expect(await claimed()).toBe(0);
+    const claim = await prisma.dealClaim.findFirstOrThrow({ where: { orderId: cod.orderId } });
+    expect(claim.releasedAt).not.toBeNull();
+
+    const online = (
+      await place(user, await buyNow(user, p.skuId, { type: 'ONLINE', provider: 'bank' }))
+    ).body;
+    expect(await claimed()).toBe(1);
+    await prisma.order.update({
+      where: { id: online.orderId },
+      data: { payBy: new Date(Date.now() - 1000) },
+    });
+    await worker.sweep();
+    expect((await orderRow(online.orderId)).status).toBe('PAYMENT_FAILED');
+    expect(await claimed()).toBe(0);
+    await worker.sweep();
+    expect(await claimed()).toBe(0);
+    await prisma.lightningDeal.update({ where: { id: deal.id }, data: { active: false } });
+  });
+
+  it('bank offer is apportioned before per-line GST: lines, tax and order reconcile', async () => {
+    const offer = await prisma.bankOffer.create({
+      data: {
+        title: '10% off ShopSphere Bank',
+        provider: 'bank',
+        percentBp: 1000,
+        startsAt: new Date(Date.now() - 60_000),
+        endsAt: new Date(Date.now() + 3_600_000),
+      },
+    });
+    try {
+      const user = await newUser();
+      const a = await newOffer({ stock: 3, price: 149_900 });
+      const b = await newOffer({ stock: 3, price: 33_300, seller: sellerMH });
+      await cartWith(user, [a.skuId, b.skuId]);
+      const created = await http()
+        .post('/checkout')
+        .set('authorization', user.auth)
+        .send({ source: 'CART' });
+      const s = (
+        await http()
+          .patch(`/checkout/${created.body.id}`)
+          .set('authorization', user.auth)
+          .send({ paymentMethod: { type: 'ONLINE', provider: 'bank' } })
+      ).body;
+      const bankOff = s.totals.bankOfferDiscountPaise as number;
+      expect(bankOff).toBe(Math.floor((149_900 + 33_300) / 10));
+      type L = {
+        lineTotalPaise: number;
+        discountPaise: number;
+        tax: { taxablePaise: number; cgstPaise: number; sgstPaise: number; igstPaise: number };
+      };
+      const lines: L[] = s.shipments.flatMap((x: { lines: L[] }) => x.lines);
+      const gst = (l: L) => l.tax.cgstPaise + l.tax.sgstPaise + l.tax.igstPaise;
+      expect(lines.reduce((t, l) => t + l.discountPaise, 0)).toBe(bankOff);
+      for (const l of lines) {
+        expect(l.tax.taxablePaise + gst(l)).toBe(l.lineTotalPaise - l.discountPaise);
+      }
+      expect(lines.reduce((t, l) => t + gst(l), 0)).toBe(s.totals.tax.totalPaise);
+      const goods = lines.reduce((t, l) => t + l.tax.taxablePaise + gst(l), 0);
+      expect(goods + s.totals.deliveryPaise).toBe(s.totals.totalPaise);
+
+      const { orderId } = (await place(user, s)).body;
+      const o = await prisma.order.findUniqueOrThrow({
+        where: { id: orderId },
+        include: { items: true },
+      });
+      const stored = o.items.reduce(
+        (t, i) => t + Number(i.taxablePaise + i.cgstPaise + i.sgstPaise + i.igstPaise),
+        0,
+      );
+      expect(stored + Number(o.deliveryPaise)).toBe(Number(o.totalPaise));
+      expect(Number(o.cgstPaise + o.sgstPaise + o.igstPaise)).toBe(s.totals.tax.totalPaise);
+    } finally {
+      await prisma.bankOffer.update({ where: { id: offer.id }, data: { active: false } });
+    }
   });
 });

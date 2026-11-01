@@ -73,6 +73,8 @@ describe('returns: pickup, QC on receipt and refunds (integration)', () => {
   let courier: { nest: any; url: string; svc: any };
   let sellerAuth: string;
   let skuId: string;
+  let phoneSkuId: string;
+  let phoneOfferId: string;
   const http = () => request(baseUrl);
   const advance = (awb: string) =>
     request(courier.url).post(`/v1/shipments/${awb}/advance`).set('x-api-key', KEY).expect(200);
@@ -154,6 +156,36 @@ describe('returns: pickup, QC on receipt and refunds (integration)', () => {
         maxPerOrder: 5,
       },
     });
+    // Replace is offered for electronics (top-level slug), not for the kettle's test category.
+    const electronics = await prisma.category.upsert({
+      where: { slug: 'electronics' },
+      update: {},
+      create: { slug: 'electronics', name: 'Electronics', path: 'electronics', gstRateBp: 1800 },
+    });
+    app.get(CategoryTreeService).invalidate();
+    const phone = await prisma.product.create({
+      data: {
+        slug: `m6-phone-${run}`,
+        title: 'M6 Phone',
+        brandId: brand.id,
+        categoryId: electronics.id,
+        skus: { create: { code: `M6P-${run}`, isDefault: true } },
+      },
+      include: { skus: true },
+    });
+    phoneSkuId = phone.skus[0].id;
+    phoneOfferId = (
+      await prisma.offer.create({
+        data: {
+          skuId: phoneSkuId,
+          sellerId: seller.id,
+          price: 1_000_000n,
+          mrp: 1_200_000n,
+          stockQty: 3,
+          maxPerOrder: 5,
+        },
+      })
+    ).id;
   });
 
   afterAll(async () => {
@@ -163,7 +195,7 @@ describe('returns: pickup, QC on receipt and refunds (integration)', () => {
   });
 
   /** Paid online order taken through seller label + courier delivery. */
-  async function deliveredOrder() {
+  async function deliveredOrder(sku = skuId) {
     const buyer = await login('Buyer');
     await prisma.address.create({
       data: {
@@ -180,7 +212,7 @@ describe('returns: pickup, QC on receipt and refunds (integration)', () => {
     const created = await http()
       .post('/checkout')
       .set('authorization', buyer.auth)
-      .send({ source: 'BUY_NOW', skuId, qty: 1 });
+      .send({ source: 'BUY_NOW', skuId: sku, qty: 1 });
     const patched = await http()
       .patch(`/checkout/${created.body.id}`)
       .set('authorization', buyer.auth)
@@ -215,7 +247,7 @@ describe('returns: pickup, QC on receipt and refunds (integration)', () => {
       ),
     ).toBe('DELIVERED');
     const o = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
-    return { buyer, orderId, total: Number(o.totalPaise) };
+    return { buyer, orderId, total: Number(o.totalPaise), awb: awb! };
   }
 
   async function requestReturn(
@@ -348,6 +380,115 @@ describe('returns: pickup, QC on receipt and refunds (integration)', () => {
     });
     const info = await http().get(`/orders/${orderId}/return`).set('authorization', buyer.auth);
     expect(info.body).toMatchObject({ eligible: false, current: { status: 'REFUNDED' } });
+  });
+
+  it('shipping events and order detail carry carrier + AWB', async () => {
+    const { buyer, orderId, awb } = await deliveredOrder();
+    const shipped = await prisma.outboxEvent.findFirstOrThrow({
+      where: { aggregateId: orderId, eventType: 'order.shipped' },
+    });
+    expect(shipped.payload).toMatchObject({ courier: 'courier-sim', awb });
+    const d = await http().get(`/orders/${orderId}`).set('authorization', buyer.auth);
+    expect(d.body.shipments[0]).toMatchObject({ courier: 'courier-sim', awb });
+    expect(d.body.shipments[0].deliveredAt).toBeTruthy();
+    const delivered = d.body.events.find((e: { toStatus: string }) => e.toStatus === 'DELIVERED');
+    expect(delivered).toMatchObject({ courier: 'courier-sim', awb });
+  });
+
+  it('Replace: zero-value replacement order, stock reserved, no refund, ships via courier', async () => {
+    const { buyer, orderId } = await deliveredOrder(phoneSkuId);
+    const stockBefore = (await prisma.offer.findUniqueOrThrow({ where: { id: phoneOfferId } }))
+      .stockQty;
+    const info = await http().get(`/orders/${orderId}/return`).set('authorization', buyer.auth);
+    expect(info.body).toMatchObject({ eligible: true, replaceable: true });
+    const kettle = await deliveredOrder();
+    const kInfo = await http()
+      .get(`/orders/${kettle.orderId}/return`)
+      .set('authorization', kettle.buyer.auth);
+    expect(kInfo.body.replaceable).toBe(false);
+    const refused = await http()
+      .post(`/orders/${kettle.orderId}/return`)
+      .set('authorization', kettle.buyer.auth)
+      .send({
+        reason: 'DEFECTIVE',
+        refundTo: 'ORIGINAL',
+        pickupDate: pickupDates()[0],
+        resolution: 'REPLACE',
+      });
+    expect(refused.body.code).toBe('REPLACEMENT_UNAVAILABLE');
+
+    const res = await http()
+      .post(`/orders/${orderId}/return`)
+      .set('authorization', buyer.auth)
+      .send({
+        reason: 'DEFECTIVE',
+        refundTo: 'ORIGINAL',
+        pickupDate: pickupDates()[0],
+        resolution: 'REPLACE',
+      });
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ resolution: 'REPLACE', amountPaise: 0 });
+    const replacementId = res.body.replacementOrderId as string;
+    const rep = await prisma.order.findUniqueOrThrow({
+      where: { id: replacementId },
+      include: { items: true, shipments: true },
+    });
+    expect(rep).toMatchObject({
+      status: 'CONFIRMED',
+      replacementOfId: orderId,
+      totalPaise: 0n,
+      payablePaise: 0n,
+    });
+    expect(rep.items).toMatchObject([{ skuId: phoneSkuId, qty: 1, lineTotalPaise: 0n }]);
+    expect(rep.shipments[0].invoiceKey).toBeNull();
+    // Stock taken for the replacement at request time.
+    expect((await prisma.offer.findUniqueOrThrow({ where: { id: phoneOfferId } })).stockQty).toBe(
+      stockBefore - 1,
+    );
+    const detail = await http().get(`/orders/${replacementId}`).set('authorization', buyer.auth);
+    expect(detail.body.replacementOf).toEqual({
+      orderId,
+      number: (await prisma.order.findUniqueOrThrow({ where: { id: orderId } })).number,
+    });
+    expect(detail.body.canCancel).toBe(false);
+
+    // Seller sees it and ships the replacement through courier-sim.
+    const list = await http().get('/seller/returns').set('authorization', sellerAuth);
+    expect(list.body.items.find((r: { id: string }) => r.id === res.body.id)).toMatchObject({
+      resolution: 'REPLACE',
+      replacementOrderNumber: rep.number,
+    });
+    const sid = rep.shipments[0].id;
+    for (const step of ['accept', 'pack', 'label']) {
+      const r = await http()
+        .post(`/seller/orders/${sid}/${step}`)
+        .set('authorization', sellerAuth)
+        .send(step === 'pack' ? { weightGrams: 300 } : {});
+      expect(r.status).toBeLessThan(300);
+    }
+    const { awb } = await prisma.shipment.findUniqueOrThrow({ where: { id: sid } });
+    for (let i = 0; i < 3; i++) await advance(awb!);
+    expect(
+      await until(
+        () => orderStatus(replacementId),
+        (s) => s === 'DELIVERED',
+      ),
+    ).toBe('DELIVERED');
+    expect(await prisma.settlementLine.count({ where: { orderId: replacementId } })).toBe(0);
+
+    // Original item comes back and passes QC: REPLACED, back in stock, no money moves.
+    await pickUpAndReceive(orderId, { id: res.body.id, awb: res.body.awb });
+    const qc = await http()
+      .post(`/seller/returns/${res.body.id}/qc`)
+      .set('authorization', sellerAuth)
+      .send({ result: 'PASS' });
+    expect(qc.body.status).toBe('REPLACED');
+    expect(await orderStatus(orderId)).toBe('REPLACED');
+    expect(await prisma.refund.count({ where: { orderId } })).toBe(0);
+    expect(await ledger.balance(buyer.id)).toBe(0n);
+    expect((await prisma.offer.findUniqueOrThrow({ where: { id: phoneOfferId } })).stockQty).toBe(
+      stockBefore,
+    );
   });
 
   it('refunds instantly to ShopSphere Pay balance when the shopper picks it', async () => {
