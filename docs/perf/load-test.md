@@ -22,7 +22,9 @@ own histograms from Prometheus). Raw k6 summaries: `infra/k6/results/`.
 - Data: catalog seed (4,994 products, 21k offers, 42 categories) plus the orders the runs
   themselves create (~24k by the end, so later runs face bigger tables than earlier ones).
 - `RATE_LIMIT_PER_MINUTE` raised to 1,000,000 for the test: all VUs share one IP, and the
-  per-IP limiter would otherwise be what we measure.
+  per-IP limiter would otherwise be what we measure. Since M7.1 (merged after these runs)
+  place-order has its own limit: also set `PLACE_ORDER_RATE_LIMIT_PER_MINUTE=1000000` when
+  re-running, or every VU past the 20th order per minute gets 429.
 
 ## Results
 
