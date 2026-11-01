@@ -337,7 +337,7 @@ export function CartView() {
               <h1 id="cart-title" className="mb-2 text-2xl font-bold">
                 Your ShopSphere Cart is empty
               </h1>
-              <Link href="/" className="text-brand-dark hover:underline">
+              <Link href="/" className="text-brand-dark underline">
                 Continue shopping
               </Link>
             </>

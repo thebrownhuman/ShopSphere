@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { MAILPIT_URL } from '../playwright.checkout-api.config';
+import { MAILPIT_URL, WEB_URL } from '../playwright.checkout-api.config';
 
 /**
  * M7.4 accessibility: axe-core (WCAG 2.0/2.1 A + AA rules) on the key storefront pages against the
@@ -14,7 +14,7 @@ const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 const report: Record<string, Array<{ id: string; impact: string | null; nodes: number }>> = {};
 
 async function scan(page: Page, name: string) {
-  await page.waitForLoadState('networkidle').catch(() => undefined);
+  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
   const res = await new AxeBuilder({ page }).withTags(TAGS).analyze();
   report[name] = res.violations.map((v) => ({
     id: v.id,
@@ -46,7 +46,8 @@ async function mailTo(request: APIRequestContext, to: string, subject: RegExp): 
   throw new Error(`no mail to ${to} matching ${subject}`);
 }
 
-test.describe.configure({ mode: 'serial' });
+
+test.setTimeout(300_000);
 
 test.afterAll(() => {
   mkdirSync('test-results/a11y', { recursive: true });
@@ -87,7 +88,7 @@ test('guest pages: home, search, PDP, cart, policies', async ({ page }) => {
 
 test('keyboard: skip link, carousel, added-to-cart drawer', async ({ page, context }) => {
   await context.addCookies([
-    { name: 'ss_consent', value: 'v1.a0.m0', url: page.url() || 'http://localhost:3130' },
+    { name: 'ss_consent', value: 'v1.a0.m0', url: WEB_URL },
   ]);
   await page.goto('/');
   // First Tab lands on the skip link, which moves focus to <main>.

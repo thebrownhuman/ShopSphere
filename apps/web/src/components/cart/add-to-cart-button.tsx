@@ -31,6 +31,7 @@ export function AddToCartButton({
   if (!cart) return null;
 
   const onClick = async () => {
+    if (busy) return;
     setBusy(true);
     setError(null);
     const r = await cart.add({ sku, sellerId, qty, price });
@@ -44,7 +45,10 @@ export function AddToCartButton({
         data-testid="add-to-cart"
         {...rest}
         onClick={onClick}
-        disabled={busy || rest.disabled}
+        // Not `disabled` while busy: a disabled button drops keyboard focus, which then cannot
+        // return here when the added-to-cart drawer closes (M7.4).
+        disabled={rest.disabled}
+        aria-disabled={busy || undefined}
         aria-busy={busy}
       >
         {busy ? (

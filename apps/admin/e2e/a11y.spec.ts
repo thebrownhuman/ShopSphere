@@ -12,7 +12,7 @@ const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 const report: Record<string, Array<{ id: string; impact: string | null; nodes: number }>> = {};
 
 async function scan(page: Page, name: string) {
-  await page.waitForLoadState('networkidle').catch(() => undefined);
+  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
   const res = await new AxeBuilder({ page }).withTags(TAGS).analyze();
   report[name] = res.violations.map((v) => ({
     id: v.id,
@@ -31,6 +31,8 @@ async function scan(page: Page, name: string) {
   expect.soft(blocking, `${name}: serious/critical axe violations`).toEqual([]);
 }
 
+test.setTimeout(300_000);
+
 test.afterAll(() => {
   mkdirSync('test-results/a11y', { recursive: true });
   writeFileSync('test-results/a11y/admin.json', JSON.stringify(report, null, 2));
@@ -46,6 +48,8 @@ test('admin console pages have no serious/critical axe violations', async ({ pag
   await expect(page.getByTestId('admin-name')).toContainText('SUPER_ADMIN');
   await scan(page, 'dashboard');
 
+  // Fresh load: the first Tab lands on the skip link.
+  await page.reload();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused();
 

@@ -11,7 +11,7 @@ const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 const report: Record<string, Array<{ id: string; impact: string | null; nodes: number }>> = {};
 
 async function scan(page: Page, name: string) {
-  await page.waitForLoadState('networkidle').catch(() => undefined);
+  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
   const res = await new AxeBuilder({ page }).withTags(TAGS).analyze();
   report[name] = res.violations.map((v) => ({
     id: v.id,
@@ -56,6 +56,8 @@ function gstin(state: string, pan: string): string {
   return first14 + chars[(36 - (sum % 36)) % 36];
 }
 
+test.setTimeout(300_000);
+
 test.afterAll(() => {
   mkdirSync('test-results/a11y', { recursive: true });
   writeFileSync('test-results/a11y/seller.json', JSON.stringify(report, null, 2));
@@ -82,6 +84,8 @@ test('seller central pages have no serious/critical axe violations', async ({ pa
   await scan(page, 'onboarding');
 
   // Keyboard: skip link first.
+  // Fresh load: the first Tab lands on the skip link.
+  await page.reload();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused();
 

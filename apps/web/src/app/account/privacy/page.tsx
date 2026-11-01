@@ -66,7 +66,7 @@ export default function PrivacyDataPage() {
   return (
     <>
       <nav aria-label="Breadcrumb" className="mb-2 text-sm">
-        <Link href="/account" className="text-brand-dark hover:underline">
+        <Link href="/account" className="text-brand-dark underline">
           Your Account
         </Link>{' '}
         › Privacy &amp; data
