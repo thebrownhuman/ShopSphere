@@ -115,3 +115,4 @@ export * from './returns';
 // ───────── Admin console, promotions, home CMS (M6) ─────────
 
 export * from './admin';
+export * from './privacy';

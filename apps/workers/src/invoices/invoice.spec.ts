@@ -3,6 +3,7 @@ import type { LineTax, OrderConfirmedPayload } from '@shopsphere/types';
 import type { OrderEventEnvelope } from '../orders/order-events';
 import { invoiceLines, rupees, totals } from './gst';
 import { invoiceKey, renderInvoice } from './invoice';
+import { financialYear, irnFor, SimulatedIrpProvider, verifySimulatedQr } from './einvoice';
 import { handleInvoiceEvent } from './invoice.job';
 
 const intra = (gross: number, rateBp: number): LineTax => {
@@ -182,6 +183,71 @@ describe('invoice PDF from the full order.confirmed payload', () => {
       payload: full,
     } as OrderEventEnvelope);
     expect(out[0]).toMatchObject({ number: 'INV-OD200001-1', storageKey: 'ord-1/shp-1.pdf' });
+  });
+
+  it('registers an e-invoice (IRN + signed QR) and prints it', async () => {
+    const sent: PutObjectCommand[] = [];
+    const s3 = { send: async (c: unknown) => void sent.push(c as PutObjectCommand) };
+    const einvoice = new SimulatedIrpProvider('test-secret');
+    const event = {
+      id: 'e1',
+      type: 'order.confirmed',
+      occurredAt: full.occurredAt,
+      payload: full,
+    } as OrderEventEnvelope;
+    const now = () => new Date(full.occurredAt);
+    const out = await handleInvoiceEvent(
+      { bucket: 'invoices', s3: s3 as never, einvoice, now },
+      event,
+    );
+    const irn = irnFor('29AAACS1234C1Z5', 'INV-OD200001-1', full.occurredAt);
+    expect(out[0]!.irn).toBe(irn);
+    expect(irn).toMatch(/^[0-9a-f]{64}$/);
+    const put = sent.find((c) => c.input?.Key === 'ord-1/shp-1.pdf')!;
+    expect(put.input.Metadata).toMatchObject({ irn });
+    expect(Buffer.from(put.input.Body as Buffer).toString('latin1')).toContain(`IRN: ${irn}`);
+    // Idempotent: the same invoice registers to the same IRN.
+    const again = await handleInvoiceEvent(
+      { bucket: 'invoices', s3: s3 as never, einvoice, now },
+      event,
+    );
+    expect(again[0]!.irn).toBe(irn);
+
+    const reg = await einvoice.register({
+      sellerGstin: '29AAACS1234C1Z5',
+      docNumber: 'INV-OD200001-1',
+      docDate: full.occurredAt,
+      totalPaise: 1_703_900,
+      itemCount: 1,
+      mainHsn: '8517',
+    });
+    expect(verifySimulatedQr(reg.signedQr, 'test-secret')).toMatchObject({
+      Irn: irn,
+      SellerGstin: '29AAACS1234C1Z5',
+      BuyerGstin: 'URP',
+      TotInvVal: 17039,
+    });
+    expect(verifySimulatedQr(reg.signedQr, 'other-secret')).toBeNull();
+  });
+
+  it('skips e-invoicing without a seller GSTIN', async () => {
+    const s3 = { send: async () => undefined };
+    const out = await handleInvoiceEvent(
+      { bucket: 'invoices', s3: s3 as never, einvoice: new SimulatedIrpProvider('x') },
+      {
+        id: 'e2',
+        type: 'order.confirmed',
+        occurredAt: order.occurredAt,
+        payload: order,
+      } as OrderEventEnvelope,
+    );
+    expect(out[0]!.irn).toBeUndefined();
+  });
+
+  it('computes the Indian financial year', () => {
+    expect(financialYear('2026-11-01')).toBe('2026-27');
+    expect(financialYear('2027-03-31')).toBe('2026-27');
+    expect(financialYear('2027-04-01')).toBe('2027-28');
   });
 });
 

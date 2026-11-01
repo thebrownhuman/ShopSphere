@@ -348,6 +348,8 @@ model Product {
   salesRank       Int            @default(1000000) @map("sales_rank")
   boughtLastMonth Int            @default(0) @map("bought_last_month")
   returnDays      Int            @default(7) @map("return_days")
+  /// Consumer Protection (E-Commerce) Rules 2020: shown on the PDP.
+  countryOfOrigin String         @default("India") @map("country_of_origin")
   /// ACTIVE | DRAFT | BLOCKED
   status          String         @default("ACTIVE")
   createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -1302,4 +1304,27 @@ model BankOfferRedemption {
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@map("bank_offer_redemptions")
+}
+
+// ───────── Privacy (M7.3, DPDP Act 2023) ─────────
+
+/// Data-principal requests. kind EXPORT: PENDING → READY | FAILED (zip in the private bucket,
+/// link valid until expires_at). kind DELETE: SCHEDULED → COMPLETED | CANCELLED after the grace
+/// period (scheduled_for).
+model PrivacyRequest {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  kind         String
+  status       String
+  objectKey    String?   @map("object_key")
+  error        String?
+  scheduledFor DateTime? @map("scheduled_for") @db.Timestamptz(6)
+  expiresAt    DateTime? @map("expires_at") @db.Timestamptz(6)
+  completedAt  DateTime? @map("completed_at") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([userId, createdAt], map: "idx_privacy_requests_user")
+  @@index([kind, status, scheduledFor], map: "idx_privacy_requests_due")
+  @@map("privacy_requests")
 }

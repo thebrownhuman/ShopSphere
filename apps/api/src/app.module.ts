@@ -18,6 +18,7 @@ import { RateLimitGuard } from './modules/shared/rate-limit/rate-limit.guard';
 import { ReturnsModule } from './modules/returns/returns.module';
 import { SearchModule } from './modules/search/search.module';
 import { SellerModule } from './modules/seller/seller.module';
+import { PrivacyModule } from './modules/privacy/privacy.module';
 import { QaModule } from './modules/qa/qa.module';
 import { ReviewModule } from './modules/review/review.module';
 import { RequestIdMiddleware } from './modules/shared/request-id/request-id.middleware';
@@ -45,6 +46,7 @@ import { SupportModule } from './modules/support/support.module';
     ReturnsModule,
     SupportModule,
     AdminModule,
+    PrivacyModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },

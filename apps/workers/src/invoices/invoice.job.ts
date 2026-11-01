@@ -5,6 +5,8 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import type { OrderEventEnvelope } from '../orders/order-events';
+import { einvoiceProviderFromEnv, type EInvoiceProvider } from './einvoice';
+import { invoiceLines, totals } from './gst';
 import { invoiceKey, invoiceNumber, renderInvoice } from './invoice';
 
 /**
@@ -20,6 +22,8 @@ export interface InvoiceJobOptions {
   bucket: string;
   s3: Pick<S3Client, 'send'>;
   now?: () => Date;
+  /** GST e-invoicing (IRN + signed QR). Skipped for shipments without a seller GSTIN. */
+  einvoice?: EInvoiceProvider;
 }
 
 export function invoiceOptionsFromEnv(env: NodeJS.ProcessEnv): InvoiceJobOptions {
@@ -34,6 +38,7 @@ export function invoiceOptionsFromEnv(env: NodeJS.ProcessEnv): InvoiceJobOptions
         secretAccessKey: env.S3_SECRET_KEY ?? 'any',
       },
     }),
+    einvoice: einvoiceProviderFromEnv(env),
   };
 }
 
@@ -42,6 +47,7 @@ export interface GeneratedInvoice {
   number: string;
   storageKey: string;
   bytes: number;
+  irn?: string;
 }
 
 const ready = new WeakMap<object, Promise<void>>();
@@ -76,7 +82,20 @@ export async function handleInvoiceEvent(
   const out: GeneratedInvoice[] = [];
   for (const [i, shipment] of order.shipments.entries()) {
     const number = shipment.invoiceNumber ?? invoiceNumber(order, i);
-    const body = renderInvoice(order, shipment, { number, issuedAt });
+    const gstin = shipment.sellerGstin ?? undefined;
+    const lines = invoiceLines(shipment);
+    const einvoice =
+      opts.einvoice && gstin
+        ? await opts.einvoice.register({
+            sellerGstin: gstin,
+            docNumber: number,
+            docDate: issuedAt,
+            totalPaise: totals(lines).gross + (shipment.deliveryFeePaise ?? 0),
+            itemCount: lines.length,
+            mainHsn: lines.find((l) => l.hsn)?.hsn ?? undefined,
+          })
+        : undefined;
+    const body = renderInvoice(order, shipment, { number, issuedAt, einvoice });
     const storageKey = shipment.invoiceKey ?? invoiceKey(order.orderId, shipment.shipmentId);
     await opts.s3.send(
       new PutObjectCommand({
@@ -85,9 +104,16 @@ export async function handleInvoiceEvent(
         Body: body,
         ContentType: 'application/pdf',
         ContentDisposition: `attachment; filename="${number}.pdf"`,
+        Metadata: einvoice ? { irn: einvoice.irn, 'ack-no': einvoice.ackNo } : undefined,
       }),
     );
-    out.push({ shipmentId: shipment.shipmentId, number, storageKey, bytes: body.length });
+    out.push({
+      shipmentId: shipment.shipmentId,
+      number,
+      storageKey,
+      bytes: body.length,
+      irn: einvoice?.irn,
+    });
   }
   return out;
 }

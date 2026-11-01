@@ -1,4 +1,5 @@
 import type { OrderConfirmedPayload } from '@shopsphere/types';
+import type { EInvoiceResult } from './einvoice';
 import { invoiceLines, rupees, totals } from './gst';
 import { A4, PdfDoc } from './pdf';
 
@@ -15,6 +16,8 @@ export interface InvoiceMeta {
   number: string;
   /** ISO date of issue. */
   issuedAt: string;
+  /** IRN + signed QR from the e-invoice provider (M7.3); absent without a seller GSTIN. */
+  einvoice?: EInvoiceResult;
 }
 
 export interface InvoiceExtras {
@@ -133,6 +136,20 @@ export function renderInvoice(
     y -= 13;
   }
   y -= 20;
+  if (meta.einvoice) {
+    const e = meta.einvoice;
+    // QR stub: the signed payload is printed; a real QR image comes with the IRP integration.
+    pdf.rule(470, y + 10, 555, y + 10);
+    pdf.rule(470, y - 75, 555, y - 75);
+    pdf.rule(470, y + 10, 470, y - 75);
+    pdf.rule(555, y + 10, 555, y - 75);
+    pdf.text(478, y - 30, 'e-Invoice QR', 8, true);
+    pdf.text(478, y - 42, '(simulated)', 7);
+    pdf.text(40, y, `IRN: ${e.irn}`, 7, true);
+    pdf.text(40, y - 11, `Ack no: ${e.ackNo}   Ack date: ${e.ackDate}`, 7);
+    pdf.text(40, y - 22, `Signed QR: ${clip(e.signedQr, 90)}`, 6);
+    y -= 90;
+  }
   pdf.text(40, y, `For ${shipment.sellerName}`, 9, true);
   pdf.text(
     40,
