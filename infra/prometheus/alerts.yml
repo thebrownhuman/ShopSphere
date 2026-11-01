@@ -1,0 +1,57 @@
+# M7.7 alert rules (PRD §10). Each alert links its runbook in docs/runbooks/.
+groups:
+  - name: shopsphere-payments
+    rules:
+      - alert: PaymentSuccessRateLow
+        # Captures vs failures from gateway webhooks over 5 min; needs >= 10 outcomes to judge.
+        expr: |
+          (
+            # `or vector(0)`: with zero captures the numerator has no series and the alert would
+            # never fire in a total outage.
+            (sum(increase(payment_outcomes_total{outcome=~"CAPTURED|CAPTURED_REFUNDED"}[5m])) or vector(0))
+            /
+            sum(increase(payment_outcomes_total{outcome=~"CAPTURED|CAPTURED_REFUNDED|FAILED"}[5m]))
+          ) < 0.90
+          and sum(increase(payment_outcomes_total{outcome=~"CAPTURED|CAPTURED_REFUNDED|FAILED"}[5m])) >= 10
+        for: 1m
+        labels: { severity: page, team: payments }
+        annotations:
+          summary: 'Payment success rate {{ $value | humanizePercentage }} (< 90%) over 5 min'
+          runbook: docs/runbooks/payment-success-rate-low.md
+
+      - alert: PaymentWebhookLagHigh
+        # Oldest attempt the shopper returned from that still has no capture/failure webhook,
+        # or p95 of event-created -> received above 2 min.
+        expr: |
+          max(payment_webhook_backlog_oldest_seconds) > 120
+          or
+          histogram_quantile(0.95, sum by (le) (rate(payment_webhook_lag_seconds_bucket[5m]))) > 120
+        for: 1m
+        labels: { severity: page, team: payments }
+        annotations:
+          summary: 'Payment webhook lag {{ $value | humanizeDuration }} (> 2 min)'
+          runbook: docs/runbooks/payment-webhook-lag.md
+
+  - name: shopsphere-api
+    rules:
+      - alert: Api5xxRateHigh
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m]))
+          / sum(rate(http_requests_total[5m])) > 0.02
+          and sum(rate(http_requests_total[5m])) > 0.2
+        for: 2m
+        labels: { severity: page, team: platform }
+        annotations:
+          summary: 'API 5xx rate {{ $value | humanizePercentage }} (> 2%)'
+          runbook: docs/runbooks/api-5xx-rate.md
+
+      - alert: CheckoutLatencyP99High
+        expr: |
+          histogram_quantile(0.99,
+            sum by (le) (rate(http_request_duration_seconds_bucket{route=~"/checkout.*"}[5m]))
+          ) > 1
+        for: 5m
+        labels: { severity: page, team: checkout }
+        annotations:
+          summary: 'Checkout p99 {{ $value | humanizeDuration }} (> 1 s)'
+          runbook: docs/runbooks/checkout-latency.md

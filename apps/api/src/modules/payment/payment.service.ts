@@ -1,7 +1,8 @@
-import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { AppError } from '../shared/errors/app-error';
+import { MetricsService } from '../shared/metrics/metrics.service';
 import {
   AttemptStatus,
   EventOutcome,
@@ -63,6 +64,7 @@ export class PaymentService {
     @Inject(PAYMENT_REPOSITORY) private readonly repo: PaymentRepository,
     private readonly providers: ProviderRegistry,
     @Inject(PAYABLE_ORDER_SOURCE) private readonly orders: PayableOrderSource,
+    @Optional() private readonly metrics?: MetricsService,
   ) {}
 
   async initiate(
@@ -222,6 +224,14 @@ export class PaymentService {
     const event = provider.verifyWebhook(rawBody, headers);
     const payload = JSON.parse(rawBody.toString('utf8')) as unknown;
     const { outcome } = await this.applyEvent(provider.name, event, payload);
+    this.metrics?.paymentOutcomes.inc({ provider: provider.name, type: event.type, outcome });
+    const createdAt = (payload as { created_at?: unknown }).created_at;
+    if (typeof createdAt === 'number' && outcome !== 'DUPLICATE_EVENT') {
+      this.metrics?.webhookLag.observe(
+        { provider: provider.name },
+        Math.max(0, Date.now() / 1000 - createdAt),
+      );
+    }
     return { eventId: event.eventId, outcome };
   }
 

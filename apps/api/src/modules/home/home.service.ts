@@ -9,6 +9,7 @@ import { PromotionsService } from '../promotions/promotions.service';
 import { OpenSearchClient } from '../search/opensearch.client';
 import { cardFromDoc, ProductDoc } from '../search/product-document';
 import { buildSearchBody, parseSearchParams } from '../search/search-query';
+import { CacheService } from '../shared/cache/cache.service';
 import { PrismaService } from '../shared/prisma/prisma.service';
 
 /** Search-style product query stored in home_sections.data_source (same keys as GET /search). */
@@ -71,20 +72,28 @@ export class HomeService {
     private readonly discovery: DiscoveryService,
     private readonly categories: CategoryTreeService,
     private readonly promotions: PromotionsService,
+    private readonly cache: CacheService,
   ) {}
 
   async home(viewer: Viewer, now = new Date()): Promise<HomeResponse> {
-    const rows = await this.prisma.homeSection.findMany({
-      where: {
-        active: true,
-        audience: { in: ['ALL', viewer.userId ? 'SIGNED_IN' : 'GUEST'] },
-        AND: [
-          { OR: [{ startsAt: null }, { startsAt: { lte: now } }] },
-          { OR: [{ endsAt: null }, { endsAt: { gt: now } }] },
-        ],
-      },
-      orderBy: { position: 'asc' },
-    });
+    // CMS rows change rarely: cached per audience and minute (M7.5), so a scheduled section can
+    // appear or disappear up to a minute late.
+    const audience = viewer.userId ? 'SIGNED_IN' : 'GUEST';
+    const minute = Math.floor(now.getTime() / 60_000);
+    const rows = await this.cache.getOrSet('home-sections', `${audience}:${minute}`, 30, () =>
+      this.prisma.homeSection.findMany({
+        where: {
+          active: true,
+          audience: { in: ['ALL', audience] },
+          AND: [
+            { OR: [{ startsAt: null }, { startsAt: { lte: now } }] },
+            { OR: [{ endsAt: null }, { endsAt: { gt: now } }] },
+          ],
+        },
+        orderBy: { position: 'asc' },
+        select: { id: true, type: true, title: true, position: true, dataSource: true },
+      }),
+    );
     const recent = viewer.ownerKey ? await this.discovery.recentlyViewed(viewer.ownerKey) : [];
     const built = await Promise.all(
       rows.map((r) =>
@@ -274,7 +283,14 @@ export class HomeService {
     return tiles.length ? { title: c.title, tiles, cta: c.cta ?? null } : null;
   }
 
-  private async query(q: ProductQuery, limit: number): Promise<ProductCard[]> {
+  /** Search-backed rows are identical for every viewer: cached 30 s (M7.5). */
+  private query(q: ProductQuery, limit: number): Promise<ProductCard[]> {
+    return this.cache.getOrSet('home-query', `${limit}:${JSON.stringify(q)}`, 30, () =>
+      this.search(q, limit),
+    );
+  }
+
+  private async search(q: ProductQuery, limit: number): Promise<ProductCard[]> {
     const body = buildSearchBody(parseSearchParams({ ...q, pageSize: String(limit) }));
     delete body.aggs;
     delete body.suggest;

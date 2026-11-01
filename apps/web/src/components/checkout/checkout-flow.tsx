@@ -2,7 +2,7 @@
 
 import { Button, formatPaise, Skeleton } from '@shopsphere/ui';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiRequestError } from '@/lib/api';
 import { BUY_NOW_PREVIEW_KEY, checkoutApi, type CheckoutApi } from '@/lib/api/checkout';
@@ -50,6 +50,7 @@ function firstStep(s: CheckoutSession): Step {
 
 export function CheckoutFlow() {
   const params = useSearchParams();
+  const router = useRouter();
   const { request, ready, needsSignIn } = useRequester();
   const api: CheckoutApi = useMemo(() => checkoutApi(request), [request]);
   const [session, setSession] = useState<CheckoutSession | null>(null);
@@ -72,8 +73,16 @@ export function CheckoutFlow() {
         setStep(firstStep(s));
         idemKey.current = crypto.randomUUID();
       })
-      .catch((e) => setLoadError(errorText(e)));
-  }, [ready, api, params]);
+      .catch((e) => {
+        // Sale-day waiting room (M7.5): queue, then come back to this exact checkout URL.
+        if (e instanceof ApiRequestError && e.code === 'WAITING_ROOM') {
+          const next = `/checkout${params.size ? `?${params.toString()}` : ''}`;
+          router.replace(`/queue?next=${encodeURIComponent(next)}`);
+          return;
+        }
+        setLoadError(errorText(e));
+      });
+  }, [ready, api, params, router]);
 
   const apply = useCallback(
     async (patch: CheckoutPatch): Promise<string | null> => {

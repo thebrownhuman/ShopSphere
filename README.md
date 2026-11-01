@@ -1,3 +1,22 @@
+## M7 ops: load test, backups, observability (M7.5-M7.7)
+
+- Load test (M7.5): `infra/k6/journey.js` (home, search, PDP, cart, checkout, ShopSphere Bank,
+  confirmed), fixture `corepack pnpm --filter @shopsphere/api k6:journey 300`. Report with
+  before/after p95/p99: `docs/perf/load-test.md`. Migration `20261103100000_perf_indexes`.
+  New env: `DATABASE_POOL_SIZE` / `DATABASE_POOL_TIMEOUT_S` (Prisma pool), `CACHE_DISABLED`,
+  `PAYMENT_EVENTS_PARALLEL` (default 8).
+- Sale-day waiting room: `WAITING_ROOM_ENABLED` (+ runtime flag
+  `POST /waiting-room/internal/flag`), `WAITING_ROOM_RATE_PER_SEC`, `WAITING_ROOM_BURST`,
+  `WAITING_ROOM_PASS_TTL_SEC`. `POST /checkout` answers 429 `WAITING_ROOM` while queued; web
+  page `/queue`. Contract: `packages/types/src/waiting-room.ts`.
+- Backups (M7.6): `infra/backup/{backup,backup-loop,restore,restore-drill}.sh` to the SeaweedFS
+  bucket `backups`. RPO/RTO achieved: `docs/ops/backup-restore.md`.
+- Observability (M7.7): `GET /metrics` (Prometheus text format).
+  `docker compose -f infra/docker-compose.yml --profile observability up -d` starts Prometheus
+  :9090, Alertmanager :9093 (mails Mailpit) and Grafana :3300 (dashboard provisioned from
+  `infra/grafana/dashboards`). Alert rules `infra/prometheus/alerts.yml`; runbooks `docs/runbooks/`.
+  Alert drill (forced bank failures, dead webhook URL): `docs/perf/load-test.md`.
+
 ## M4/M6 gap fixes
 
 Migration `20261102100000_gap_fixes` (order_items.hsn_code, shipments.invoice_key/number,

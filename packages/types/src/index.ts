@@ -115,3 +115,6 @@ export * from './returns';
 // ───────── Admin console, promotions, home CMS (M6) ─────────
 
 export * from './admin';
+// ───────── Sale-day waiting room (M7.5) ─────────
+
+export * from './waiting-room';

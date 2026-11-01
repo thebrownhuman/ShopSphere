@@ -1,6 +1,6 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { MAILPIT_URL, S3_URL } from '../playwright.checkout-api.config';
+import { BANK_URL, MAILPIT_URL, S3_URL } from '../playwright.checkout-api.config';
 
 /**
  * M4 against the real stack (API + bank-sim + workers): sign up → add to cart → checkout →
@@ -69,7 +69,7 @@ async function choose(page: Page, method: RegExp) {
 }
 
 async function bankCard(page: Page, number: string) {
-  await expect(page).toHaveURL(/:4110\/checkout/);
+  await expect(page).toHaveURL(new RegExp(`${new URL(BANK_URL).host}/checkout`));
   await page.getByLabel('Card number').fill(number);
   await page.getByLabel('Expiry (MM/YY)').fill('12/30');
   await page.getByLabel('CVV').fill('123');

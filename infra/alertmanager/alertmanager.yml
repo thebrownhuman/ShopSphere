@@ -1,0 +1,19 @@
+# M7.7 Alertmanager. Local simulation: every alert is mailed to Mailpit (http://localhost:8025),
+# standing in for PagerDuty/Slack. Swap the receiver for a real one in a deployed environment.
+global:
+  smtp_smarthost: mailpit:1025
+  smtp_from: alertmanager@shopsphere.test
+  smtp_require_tls: false
+
+route:
+  receiver: oncall
+  group_by: [alertname]
+  group_wait: 10s
+  group_interval: 1m
+  repeat_interval: 1h
+
+receivers:
+  - name: oncall
+    email_configs:
+      - to: oncall@shopsphere.test
+        send_resolved: true

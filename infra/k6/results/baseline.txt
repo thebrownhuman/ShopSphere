@@ -1,0 +1,167 @@
+time="2026-11-01T15:13:08Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:13:08Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:13:08Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:13:09Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:13:10Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:13:10Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:01Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:02Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:02Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:02Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:21Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:21Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:22Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:22Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:22Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:22Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:23Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:23Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:23Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:23Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:24Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:24Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:25Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:25Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:25Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:26Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:26Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:26Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:26Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:27Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:27Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:44Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:44Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:44Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:45Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:45Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:45Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:45Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:45Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:46Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:46Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:46Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:46Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:47Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:47Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:47Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:57Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:57Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:57Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:58Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:58Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:59Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:59Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:14:59Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:00Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:00Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:00Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:00Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:00Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:00Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:00Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:00Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:00Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:00Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:00Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:11Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:11Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:11Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:12Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:12Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:12Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:13Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:13Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:13Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:13Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:13Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:13Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:13Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:13Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:13Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:13Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:14Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:14Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:14Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:46Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:46Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:46Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:47Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:47Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:48Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:49Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:49Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:15:50Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:16:11Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:16:11Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:16:11Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:16:12Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:16:12Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:16:12Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:16:12Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:16:12Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:16:41Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:16:41Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:16:41Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:16:41Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:16:41Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:16:41Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:16:41Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:16:41Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:16:41Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:16:41Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:16:42Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T15:16:42Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+
+
+  █ THRESHOLDS 
+
+    http_req_duration{step:checkout}
+    ✓ 'p(99)<1000' p(99)=530.3ms
+
+    http_req_failed
+    ✓ 'rate<0.01' rate=0.22%
+
+    journeys_failed
+    ✓ 'count<10' count=0
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 23264   77.908571/s
+    checks_succeeded...: 100.00% 23264 out of 23264
+    checks_failed......: 0.00%   0 out of 23264
+
+    ✓ home
+    ✓ search
+    ✓ pdp
+    ✓ add to cart
+    ✓ pay online
+    ✓ place order
+    ✓ initiate
+    ✓ verify
+
+    CUSTOM
+    checkout_to_confirmed..........: avg=4.39s   med=1.73s   p(90)=9.87s    p(95)=10.92s   p(99)=35.19s   max=1m5s    
+    journey_duration...............: avg=10.57s  med=8.11s   p(90)=16.25s   p(95)=17.8s    p(99)=40.71s   max=1m12s   
+    journeys_failed................: 0      0/s
+    orders_confirmed...............: 2908   9.738571/s
+
+    HTTP
+    http_req_duration..............: avg=42.39ms med=19.74ms p(90)=102.79ms p(95)=161.57ms p(99)=360.76ms max=911.39ms
+      { expected_response:true }...: avg=42.49ms med=19.82ms p(90)=102.93ms p(95)=161.85ms p(99)=361.24ms max=911.39ms
+      { step:checkout }............: avg=77.94ms med=37.68ms p(90)=200.29ms p(95)=301.12ms p(99)=530.3ms  max=911.39ms
+    http_req_failed................: 0.22%  113 out of 50300
+    http_reqs......................: 50300  168.449154/s
+
+    EXECUTION
+    iteration_duration.............: avg=12.06s  med=9.64s   p(90)=17.7s    p(95)=19.31s   p(99)=42.34s   max=1m13s   
+    iterations.....................: 2908   9.738571/s
+    vus............................: 6      min=0            max=200
+    vus_max........................: 200    min=200          max=200
+
+    NETWORK
+    data_received..................: 433 MB 1.4 MB/s
+    data_sent......................: 21 MB  71 kB/s
+
+
+

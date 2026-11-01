@@ -233,6 +233,7 @@ model PaymentAttempt {
 
   @@unique([provider, providerPaymentId], map: "uq_payment_attempts_provider_payment")
   @@index([orderId], map: "idx_payment_attempts_order_id")
+  @@index([paymentId], map: "idx_payment_attempts_payment_id")
   @@map("payment_attempts")
 }
 
@@ -277,6 +278,7 @@ model Refund {
 
   @@index([status], map: "idx_refunds_status")
   @@index([orderId], map: "idx_refunds_order_id")
+  @@index([attemptId], map: "idx_refunds_attempt_id")
   @@map("refunds")
 }
 
@@ -395,6 +397,7 @@ model ProductImage {
   sku        Sku?    @relation(fields: [skuId], references: [id], onDelete: Cascade)
 
   @@index([productId, position])
+  @@index([skuId], map: "idx_product_images_sku_id")
   @@map("product_images")
 }
 
@@ -731,6 +734,7 @@ model OrderItem {
 
   @@index([orderId])
   @@index([skuId])
+  @@index([shipmentId], map: "idx_order_items_shipment_id")
   @@map("order_items")
 }
 

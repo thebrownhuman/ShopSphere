@@ -20,6 +20,7 @@ import type {
 import { z } from 'zod';
 import { AppError } from '../shared/errors/app-error';
 import { SkipRateLimit } from '../shared/rate-limit/rate-limit.decorator';
+import { CacheService } from '../shared/cache/cache.service';
 import { CatalogService } from './catalog.service';
 import { CategoryTreeService } from './category-tree.service';
 import { DiscoveryService } from './discovery.service';
@@ -35,6 +36,7 @@ export class CatalogController {
     private readonly categories: CategoryTreeService,
     private readonly discovery: DiscoveryService,
     private readonly viewers: ViewerResolver,
+    private readonly cache: CacheService,
   ) {}
 
   @Get('categories')
@@ -47,7 +49,11 @@ export class CatalogController {
   @Get('products/:slug')
   @Header('Cache-Control', 'public, max-age=60')
   product(@Param('slug') slug: string, @Query('sku') sku?: string): Promise<ProductDetailResponse> {
-    return this.catalog.productBySlug(slug, sku);
+    // Within the 60 s the response already allows clients to cache; offers stay live at /offers
+    // and checkout re-prices everything (M7.5).
+    return this.cache.getOrSet('pdp', `${slug}:${sku ?? ''}`, 15, () =>
+      this.catalog.productBySlug(slug, sku),
+    );
   }
 
   @Get('products/:id/offers')
