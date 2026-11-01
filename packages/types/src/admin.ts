@@ -197,3 +197,46 @@ export interface AdminHomeSection {
 }
 
 export type HomeSectionInput = Omit<AdminHomeSection, 'id' | 'position'>;
+
+// ───────── Fraud review queue (M7.2) ─────────
+
+export type FraudDecision = 'ALLOW' | 'FORCE_PREPAID' | 'MANUAL_REVIEW' | 'CHALLENGE';
+export type FraudReviewStatus = 'NONE' | 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED';
+
+export interface FraudSignalView {
+  code: string;
+  points: number;
+  detail: string;
+}
+
+export interface FraudAssessmentView {
+  id: string;
+  orderId: string | null;
+  orderNumber: string | null;
+  orderStatus: string | null;
+  userId: string;
+  score: number;
+  decision: FraudDecision;
+  signals: FraudSignalView[];
+  paymentMethod: string;
+  totalPaise: Paise;
+  ip: string | null;
+  deviceId: string | null;
+  reviewStatus: FraudReviewStatus;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  reviewNote: string | null;
+  createdAt: string;
+}
+
+export interface FraudThresholdsView {
+  forcePrepaidScore: number;
+  reviewScore: number;
+  captchaScore: number;
+  highValuePaise: Paise;
+  newAccountDays: number;
+  userOrdersPerHour: number;
+  deviceOrdersPerHour: number;
+  deviceUsersPerDay: number;
+  ipOrdersPerHour: number;
+}

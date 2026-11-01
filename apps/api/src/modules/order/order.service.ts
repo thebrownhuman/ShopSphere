@@ -558,7 +558,12 @@ export class OrderService {
 
   // ───────── Cancel (M4.29) ─────────
 
-  async cancel(userId: string, orderId: string, reason: string | undefined): Promise<OrderDetail> {
+  async cancel(
+    userId: string,
+    orderId: string,
+    reason: string | undefined,
+    actor: 'customer' | 'admin' = 'customer',
+  ): Promise<OrderDetail> {
     const after = await this.prisma.$transaction(async (tx) => {
       const o = await this.lock(tx, orderId);
       if (!o || o.userId !== userId) throw notFound();
@@ -585,7 +590,7 @@ export class OrderService {
         ? await tx.paymentAttempt.findUnique({ where: { id: capture.attemptId } })
         : null;
       await tx.shipment.updateMany({ where: { orderId: o.id }, data: { status: 'CANCELLED' } });
-      const why = reason?.trim().slice(0, 200) || 'Cancelled by customer';
+      const why = reason?.trim().slice(0, 200) || `Cancelled by ${actor}`;
       await tx.order.update({
         where: { id: o.id },
         data: { cancelReason: why, cancelledAt: new Date(), payBy: null },
@@ -596,9 +601,9 @@ export class OrderService {
         refunds.push({ destination: 'STORE_BALANCE', amountPaise: n(o.storeBalancePaise) });
       await this.transition(tx, o, 'CANCELLED', {
         type: 'CANCELLED',
-        actor: 'customer',
+        actor,
         note: why,
-        payload: { reason: why, cancelledBy: 'customer', refunds },
+        payload: { reason: why, cancelledBy: actor, refunds },
       });
       if (balanceBack) {
         await this.emit(tx, o, 'CANCELLED', 'order.refund_issued', {

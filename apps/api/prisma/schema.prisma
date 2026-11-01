@@ -649,6 +649,8 @@ model Order {
   cancelledAt         DateTime? @map("cancelled_at") @db.Timestamptz(6)
   /// Zero-value replacement (M6.1): the original order it replaces.
   replacementOfId     String?   @map("replacement_of_id") @db.Uuid
+  /// Fraud MANUAL_REVIEW hold (M7.2): sellers cannot accept shipments until staff approve.
+  fraudHold           Boolean   @default(false) @map("fraud_hold")
   updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   shipments    Shipment[]
@@ -1302,4 +1304,33 @@ model BankOfferRedemption {
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@map("bank_offer_redemptions")
+}
+
+/// Fraud scoring v1 (M7.2): one row per scored place-order attempt (blocked attempts have no order).
+model FraudAssessment {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId    String?   @unique @map("order_id") @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  checkoutId String    @map("checkout_id") @db.Uuid
+  score      Int
+  /// ALLOW | FORCE_PREPAID | MANUAL_REVIEW | CHALLENGE
+  decision   String
+  /// [{ code, points, detail }]
+  signals    Json
+  paymentMethod String @map("payment_method")
+  totalPaise BigInt    @map("total_paise")
+  ip         String?
+  deviceId   String?   @map("device_id")
+  /// NONE | PENDING_REVIEW | APPROVED | REJECTED
+  reviewStatus String  @default("NONE") @map("review_status")
+  reviewedBy String?   @map("reviewed_by") @db.Uuid
+  reviewedAt DateTime? @map("reviewed_at") @db.Timestamptz(6)
+  reviewNote String?   @map("review_note")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId, createdAt], map: "idx_fraud_user_created")
+  @@index([deviceId, createdAt], map: "idx_fraud_device_created")
+  @@index([ip, createdAt], map: "idx_fraud_ip_created")
+  @@index([reviewStatus, createdAt], map: "idx_fraud_review_created")
+  @@map("fraud_assessments")
 }
