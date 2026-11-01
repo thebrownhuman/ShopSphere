@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 import { MAILPIT_URL, S3_URL } from '../playwright.checkout-api.config';
 
 /**
@@ -101,15 +102,33 @@ test('ShopSphere Bank card → confirmed → invoice PDF + confirmation email', 
 
   await page.getByRole('link', { name: 'View order' }).click();
   await expect(page.getByTestId('order-status')).toHaveText('Order confirmed');
-  const invoice = page.getByRole('link', { name: 'Download invoice (PDF)' }).first();
-  const href = (await invoice.getAttribute('href'))!;
-  expect(href.startsWith(`${S3_URL}/invoices/${orderId}/`)).toBe(true);
-
-  // The worker renders it from order.confirmed; poll until it lands in S3.
-  await expect.poll(async () => (await request.get(href)).status(), { timeout: 30_000 }).toBe(200);
-  const pdf = await (await request.get(href)).body();
+  // The worker renders it from order.confirmed; the button fetches a fresh signed URL per click.
+  const invoice = page.getByRole('button', { name: 'Download invoice (PDF)' }).first();
+  let signedUrl = '';
+  let file = '';
+  await expect
+    .poll(
+      async () => {
+        const [dl] = await Promise.all([
+          page.waitForEvent('download', { timeout: 4_000 }).catch(() => null),
+          invoice.click(),
+        ]);
+        if (!dl) return false;
+        signedUrl = dl.url();
+        file = (await dl.path())!;
+        return true;
+      },
+      { timeout: 45_000 },
+    )
+    .toBe(true);
+  expect(signedUrl.startsWith(`${S3_URL}/invoices/${orderId}/`)).toBe(true);
+  expect(signedUrl).toContain('X-Amz-Signature=');
+  const pdf = readFileSync(file);
   expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
   expect(pdf.toString('latin1')).toContain(number);
+  expect(pdf.toString('latin1')).not.toContain('not on file');
+  // The bucket is private: the same object without a signature is refused.
+  expect((await request.get(signedUrl.split('?')[0]!)).status()).toBe(403);
 
   await mailTo(request, email, new RegExp(`order ${number} is confirmed`));
 });

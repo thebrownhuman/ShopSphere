@@ -182,3 +182,100 @@ test('delivered order → return → courier pickup → QC on receipt → refund
   await expect(page.getByTestId('order-status')).toHaveText('Refunded');
   await expect(page.getByTestId('return-status')).toHaveText('Refunded');
 });
+
+/**
+ * Replace (M6.1 follow-up): delivered electronics order → shopper picks "Replace" → zero-value
+ * replacement order (stock reserved) ships through courier-sim → original passes QC → Replaced,
+ * no refund anywhere.
+ */
+test('delivered order → Replace → zero-value replacement ships → QC → replaced, no refund', async ({
+  page,
+  request,
+}) => {
+  await signUp(page, request);
+  const orderId = await placePaidOrder(page);
+
+  const seller = await apiUser(request);
+  execFileSync(
+    process.execPath,
+    [path.join(__dirname, 'support', 'link-seller.cjs'), orderId, seller.id],
+    { env: { ...process.env, DATABASE_URL } },
+  );
+  const auth = { authorization: `Bearer ${seller.token}` };
+  const sellerPost = async (url: string, data: object = {}) => {
+    const res = await request.post(`${API_URL}${url}`, { headers: auth, data });
+    expect(res.status(), `${url}: ${await res.text()}`).toBeLessThan(300);
+    return res.json();
+  };
+  const advance = (id: string) =>
+    request.post(`${COURIER_URL}/v1/shipments/${id}/advance`, {
+      headers: { 'x-api-key': COURIER_KEY },
+    });
+  /** Seller accept → pack → label, then courier delivers. Returns the AWB. */
+  const shipAndDeliver = async (forOrder: string) => {
+    const queue = await (
+      await request.get(`${API_URL}/seller/orders?status=CONFIRMED`, { headers: auth })
+    ).json();
+    const shipment = queue.items.find((s: { orderId: string }) => s.orderId === forOrder);
+    expect(shipment, `shipment for ${forOrder} in seller queue`).toBeTruthy();
+    await sellerPost(`/seller/orders/${shipment.id}/accept`);
+    await sellerPost(`/seller/orders/${shipment.id}/pack`, { weightGrams: 400 });
+    const { awb } = await sellerPost(`/seller/orders/${shipment.id}/label`);
+    for (let i = 0; i < 3; i++) expect((await advance(awb)).ok()).toBe(true);
+    return awb as string;
+  };
+
+  const awb = await shipAndDeliver(orderId);
+  await page.goto(`/orders/${orderId}`);
+  await expect(page.getByTestId('order-status')).toHaveText('Delivered', { timeout: 15_000 });
+  // Carrier + AWB on the shipment and in the tracking timeline.
+  await expect(page.getByText(`Tracking ID (AWB) ${awb}`)).toBeVisible();
+  await expect(page.getByText(`AWB ${awb}`).first()).toBeVisible();
+
+  // Shopper chooses Replace (headphones are electronics: replaceable).
+  await page.getByTestId('return-order').click();
+  await page.getByTestId('return-reason').selectOption('DEFECTIVE');
+  await page.getByTestId('resolution-REPLACE').check();
+  await expect(page.getByTestId('refund-ORIGINAL')).toHaveCount(0);
+  await page.getByTestId('pickup-0').check();
+  await page.getByTestId('confirm-return').click();
+  await expect(page.getByTestId('order-status')).toHaveText('Return requested');
+  const link = page.getByTestId('replacement-order-link');
+  await expect(link).toBeVisible();
+  const replacementId = (await link.getAttribute('href'))!.split('/').pop()!;
+
+  // Replacement order: zero value, linked back, not cancellable.
+  await link.click();
+  await expect(page.getByTestId('replacement-of')).toBeVisible();
+  await expect(page.getByTestId('order-status')).toHaveText('Order confirmed');
+
+  // Seller sees the Replace return and ships the replacement through courier-sim.
+  const list = await (await request.get(`${API_URL}/seller/returns`, { headers: auth })).json();
+  const mine = list.items.find((r: { orderId: string }) => r.orderId === orderId);
+  expect(mine).toMatchObject({ resolution: 'REPLACE', amountPaise: 0 });
+  expect(mine.replacementOrderNumber).toBeTruthy();
+  await shipAndDeliver(replacementId);
+  await expect
+    .poll(async () => {
+      await page.reload();
+      return page.getByTestId('order-status').textContent();
+    })
+    .toBe('Delivered');
+
+  // Original comes back; QC pass → Replaced, and no money moved.
+  for (let i = 0; i < 3; i++) expect((await advance(mine.awb)).ok()).toBe(true);
+  await expect
+    .poll(async () => {
+      const r = await (
+        await request.get(`${API_URL}/seller/returns?status=RECEIVED`, { headers: auth })
+      ).json();
+      return r.items.some((x: { id: string }) => x.id === mine.id);
+    })
+    .toBe(true);
+  const qc = await sellerPost(`/seller/returns/${mine.id}/qc`, { result: 'PASS' });
+  expect(qc.status).toBe('REPLACED');
+
+  await page.goto(`/orders/${orderId}`);
+  await expect(page.getByTestId('order-status')).toHaveText('Replaced');
+  await expect(page.getByTestId('return-status')).toHaveText(/Replaced/);
+});

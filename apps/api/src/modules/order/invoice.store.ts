@@ -14,8 +14,9 @@ export abstract class InvoiceStore {
 @Injectable()
 export class S3InvoiceStore extends InvoiceStore {
   private readonly bucket = process.env.INVOICE_BUCKET ?? 'invoices';
+  // Signatures cover the host, so sign against the endpoint browsers reach.
   private readonly s3 = new S3Client({
-    endpoint: process.env.S3_ENDPOINT ?? 'http://localhost:8333',
+    endpoint: process.env.S3_PUBLIC_ENDPOINT ?? process.env.S3_ENDPOINT ?? 'http://localhost:8333',
     region: process.env.S3_REGION ?? 'us-east-1',
     forcePathStyle: true,
     credentials: {
