@@ -3,6 +3,7 @@ import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AdminModule } from './modules/admin/admin.module';
 import { CartModule } from './modules/cart/cart.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
+import { FraudModule } from './modules/fraud/fraud.module';
 import { CheckoutModule } from './modules/checkout/checkout.module';
 import { FulfilmentModule } from './modules/fulfilment/fulfilment.module';
 import { HealthModule } from './modules/health/health.module';
@@ -21,6 +22,7 @@ import { SellerModule } from './modules/seller/seller.module';
 import { QaModule } from './modules/qa/qa.module';
 import { ReviewModule } from './modules/review/review.module';
 import { HttpMetricsMiddleware } from './modules/shared/metrics/metrics.module';
+import { SecurityHeadersMiddleware } from './modules/shared/security/security-headers';
 import { RequestIdMiddleware } from './modules/shared/request-id/request-id.middleware';
 import { SharedModule } from './modules/shared/shared.module';
 import { SupportModule } from './modules/support/support.module';
@@ -46,6 +48,7 @@ import { SupportModule } from './modules/support/support.module';
     ReturnsModule,
     SupportModule,
     AdminModule,
+    FraudModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },
@@ -55,6 +58,6 @@ import { SupportModule } from './modules/support/support.module';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(RequestIdMiddleware, HttpMetricsMiddleware).forRoutes('*');
+    consumer.apply(SecurityHeadersMiddleware, RequestIdMiddleware, HttpMetricsMiddleware).forRoutes('*');
   }
 }

@@ -34,10 +34,9 @@ export class RateLimitGuard implements CanActivate {
       [ctx.getHandler(), ctx.getClass()],
     );
     if (override === null) return true;
-    const { limit, windowSeconds } = override ?? {
-      limit: this.config.get('RATE_LIMIT_PER_MINUTE'),
-      windowSeconds: 60,
-    };
+    const opts = override ?? { limit: this.config.get('RATE_LIMIT_PER_MINUTE'), windowSeconds: 60 };
+    const { windowSeconds } = opts;
+    const limit = opts.limitFrom ? this.config.get(opts.limitFrom) : opts.limit;
 
     const req = ctx.switchToHttp().getRequest<Request>();
     const res = ctx.switchToHttp().getResponse<Response>();

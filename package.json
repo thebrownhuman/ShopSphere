@@ -16,11 +16,28 @@
     "infra:up": "docker compose -f infra/docker-compose.yml up -d",
     "infra:down": "docker compose -f infra/docker-compose.yml down",
     "db:migrate": "pnpm --filter @shopsphere/api db:migrate",
-    "db:seed": "pnpm --filter @shopsphere/api db:seed"
+    "db:seed": "pnpm --filter @shopsphere/api db:seed",
+    "audit:prod": "pnpm audit --prod --audit-level high"
   },
   "devDependencies": {
     "prettier": "3.4.2",
     "turbo": "2.3.3",
     "typescript": "5.7.2"
+  },
+  "pnpm": {
+    "overrides": {
+      "body-parser@<1.20.9": "1.20.9",
+      "path-to-regexp@<0.1.13": "0.1.13",
+      "express@4": "4.22.3",
+      "fast-xml-parser@4": "4.5.7",
+      "multer@1.4.4-lts.1": "2.5.0",
+      "postcss@<8.5.18": "8.5.32"
+    },
+    "auditConfig": {
+      "ignoreGhsas": [
+        "GHSA-7mvr-c777-76hp",
+        "GHSA-mrhx-c7xc-m3w5"
+      ]
+    }
   }
 }

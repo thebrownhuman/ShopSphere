@@ -1,14 +1,9 @@
-'use client';
-
-import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { RequireAuth } from '@/lib/auth';
+import { AccountShell } from './account-shell';
+
+/** Rendered per request so the nonce-based CSP from middleware.ts applies (M7.1). */
+export const dynamic = 'force-dynamic';
 
 export default function AccountLayout({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
-  return (
-    <RequireAuth returnTo={pathname}>
-      <main className="mx-auto max-w-4xl px-4 py-8">{children}</main>
-    </RequireAuth>
-  );
+  return <AccountShell>{children}</AccountShell>;
 }

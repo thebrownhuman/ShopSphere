@@ -117,6 +117,13 @@ export class FulfilmentService {
           HttpStatus.CONFLICT,
         );
       }
+      if (o.fraudHold) {
+        throw new AppError(
+          'ORDER_ON_HOLD',
+          'Order is held for a risk review; do not ship it yet',
+          HttpStatus.CONFLICT,
+        );
+      }
       await this.move(tx, s.id, 'CONFIRMED', 'ACCEPTED', { acceptedAt: new Date() });
     });
     return view(await this.find(sellerId, shipmentId));

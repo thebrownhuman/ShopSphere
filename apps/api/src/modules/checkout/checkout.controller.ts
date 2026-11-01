@@ -8,12 +8,16 @@ import {
   Param,
   Patch,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import type { CheckoutSession, PlaceOrderResponse } from '@shopsphere/types';
+import type { Request } from 'express';
 import { z } from 'zod';
 import { AccessTokenGuard, Auth } from '../identity/security/access-token.guard';
 import type { AccessClaims } from '../identity/tokens/session.service';
+import { COOKIES } from '../identity/security/cookies.service';
+import { RateLimit } from '../shared/rate-limit/rate-limit.decorator';
 import { Idempotent, IDEMPOTENCY_HEADER } from '../shared/idempotency/idempotency.interceptor';
 import { WaitingRoomGuard } from '../waiting-room/waiting-room.module';
 import { CheckoutService } from './checkout.service';
@@ -64,7 +68,12 @@ const updateSchema = z
   })
   .strict();
 
-const placeSchema = z.object({ expectedTotalPaise: z.number().int().min(0) });
+const placeSchema = z.object({
+  expectedTotalPaise: z.number().int().min(0),
+  /** Turnstile token, only needed after a CAPTCHA_REQUIRED (428) step-up. */
+  captchaToken: z.string().max(2048).optional(),
+});
+const DEVICE_ID = /^[A-Za-z0-9_-]{16,64}$/;
 
 /** Checkout (M4.3–M4.9). Signed-in only; every total is computed server-side. */
 @Controller('checkout')
@@ -98,12 +107,20 @@ export class CheckoutController {
   @Post(':id/place-order')
   @HttpCode(201)
   @Idempotent()
+  @RateLimit({ limit: 20, windowSeconds: 60, limitFrom: 'PLACE_ORDER_RATE_LIMIT_PER_MINUTE' })
   place(
     @Auth() auth: AccessClaims,
     @Param('id') id: string,
     @Body() body: unknown,
     @Headers(IDEMPOTENCY_HEADER) key: string,
+    @Req() req: Request,
   ): Promise<PlaceOrderResponse> {
-    return this.checkout.placeOrder(auth.sub, id, key, placeSchema.parse(body).expectedTotalPaise);
+    const { expectedTotalPaise, captchaToken } = placeSchema.parse(body);
+    const device = req.cookies?.[COOKIES.device] as string | undefined;
+    return this.checkout.placeOrder(auth.sub, id, key, expectedTotalPaise, {
+      ip: req.ip ?? null,
+      deviceId: device && DEVICE_ID.test(device) ? device : null,
+      captchaToken,
+    });
   }
 }

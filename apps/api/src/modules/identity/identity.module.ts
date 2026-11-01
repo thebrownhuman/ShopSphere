@@ -37,7 +37,7 @@ import { SessionService } from './tokens/session.service';
     AccessTokenGuard,
     ContactLookupService,
   ],
-  exports: [SessionService, AccessTokenGuard, ContactLookupService],
+  exports: [SessionService, AccessTokenGuard, ContactLookupService, CaptchaService],
 })
 export class IdentityModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

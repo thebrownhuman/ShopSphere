@@ -69,7 +69,7 @@ async function choose(page: Page, method: RegExp) {
 }
 
 async function bankCard(page: Page, number: string) {
-  await expect(page).toHaveURL(new RegExp(`${new URL(BANK_URL).host}/checkout`));
+  await expect(page).toHaveURL(new RegExp(`^${BANK_URL}/checkout`));
   await page.getByLabel('Card number').fill(number);
   await page.getByLabel('Expiry (MM/YY)').fill('12/30');
   await page.getByLabel('CVV').fill('123');

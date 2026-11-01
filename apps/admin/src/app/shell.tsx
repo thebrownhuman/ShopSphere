@@ -13,6 +13,7 @@ const NAV: { href: string; label: string; roles: StaffRole[] }[] = [
   { href: '/sellers', label: 'Sellers', roles: ['CATALOG', 'SUPPORT'] },
   { href: '/catalog', label: 'Catalog', roles: ['CATALOG'] },
   { href: '/orders', label: 'Orders', roles: ['SUPPORT', 'FINANCE'] },
+  { href: '/fraud', label: 'Fraud review', roles: ['SUPPORT'] },
   { href: '/promotions', label: 'Promotions', roles: ['CATALOG', 'FINANCE'] },
   { href: '/home-cms', label: 'Home page', roles: ['CATALOG'] },
   // Review moderation lands with the reviews milestone (/admin/reviews API on its branch).
