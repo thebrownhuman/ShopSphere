@@ -16,7 +16,7 @@ module.exports = {
       },
       animation: { 'cart-pop': 'cart-pop 400ms ease-out' },
       colors: {
-        brand: { DEFAULT: '#2874f0', dark: '#1a5bd0', darker: '#0f3f99', navy: '#172337' },
+        brand: { DEFAULT: '#2266dd', dark: '#1a5bd0', darker: '#0f3f99', navy: '#172337' },
         accent: { DEFAULT: '#fb641b', dark: '#c2410c', darker: '#9a3412' },
         cta: { DEFAULT: '#ffd814', dark: '#f7ca00' },
         deal: { DEFAULT: '#b91c1c' },

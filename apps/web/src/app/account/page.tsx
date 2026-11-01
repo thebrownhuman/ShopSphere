@@ -51,7 +51,7 @@ export default function AccountPage() {
             <>
               <h2 className="font-semibold">{t.title}</h2>
               <p className="text-sm text-slate-600">{t.body}</p>
-              {!t.href && <p className="mt-2 text-xs text-slate-400">Coming soon</p>}
+              {!t.href && <p className="mt-2 text-xs text-slate-500">Coming soon</p>}
             </>
           );
           return (

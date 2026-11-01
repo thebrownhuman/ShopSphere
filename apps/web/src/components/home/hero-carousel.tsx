@@ -40,6 +40,11 @@ export function HeroCarousel({ banners }: { banners: Banner[] }) {
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
+      onKeyDown={(e) => {
+        // Arrow keys move between slides while focus is inside the carousel (M7.4).
+        if (e.key === 'ArrowRight') go(index + 1);
+        else if (e.key === 'ArrowLeft') go(index - 1);
+      }}
       onTouchStart={(e) => (touchX.current = e.touches[0]!.clientX)}
       onTouchEnd={(e) => {
         if (touchX.current === null) return;

@@ -19,6 +19,7 @@
     "react-dom": "19.0.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.10.1",
     "@playwright/test": "1.49.1",
     "@shopsphere/config": "workspace:*",
     "@types/node": "22.10.2",

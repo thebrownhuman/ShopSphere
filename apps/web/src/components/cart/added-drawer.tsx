@@ -11,14 +11,38 @@ import { AddToCartButton } from './add-to-cart-button';
 export function AddedToCartDrawer() {
   const { drawer, closeDrawer, cart } = useCart();
   const closeRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
+  const open = !!drawer;
 
+  // Modal focus management (M7.4): focus moves in, Tab stays inside, Escape closes and focus
+  // returns to whatever opened the drawer (usually the Add to cart button).
   useEffect(() => {
-    if (!drawer) return;
+    if (!open) return;
+    const previous = document.activeElement as HTMLElement | null;
     closeRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && closeDrawer();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') return closeDrawer();
+      if (e.key !== 'Tab' || !panelRef.current) return;
+      const items = panelRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select, [tabindex]:not([tabindex="-1"])',
+      );
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (!first || !last) return;
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [drawer, closeDrawer]);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      if (previous?.isConnected) previous.focus();
+    };
+  }, [open, closeDrawer]);
 
   if (!drawer || !cart) return null;
   const line = cart.groups.flatMap((g) => g.lines).find((l) => l.id === drawer.lineId);
@@ -34,6 +58,7 @@ export function AddedToCartDrawer() {
         onClick={closeDrawer}
       />
       <aside
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="added-title"

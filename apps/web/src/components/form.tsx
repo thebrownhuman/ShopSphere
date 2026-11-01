@@ -50,7 +50,7 @@ export function Button({
   busy?: boolean;
 }) {
   const styles = {
-    primary: 'bg-accent text-white hover:brightness-95 shadow-sm',
+    primary: 'bg-accent-dark text-white hover:bg-accent-darker shadow-sm',
     secondary: 'border border-slate-300 bg-white text-slate-800 hover:bg-slate-50',
     ghost: 'text-brand hover:underline',
     danger: 'border border-red-300 bg-white text-red-700 hover:bg-red-50',

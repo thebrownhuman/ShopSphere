@@ -212,7 +212,7 @@ export default function OrdersPage() {
               {detail.tracking.map((t) => (
                 <li
                   key={`${t.status}${t.occurredAt}`}
-                  className={t.applied ? '' : 'text-slate-400'}
+                  className={t.applied ? '' : 'text-slate-500'}
                 >
                   {new Date(t.occurredAt).toLocaleString('en-IN')} — {t.status.replace(/_/g, ' ')}
                   {t.location ? `, ${t.location}` : ''}

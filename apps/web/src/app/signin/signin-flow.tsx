@@ -249,7 +249,7 @@ export function SignInFlow() {
           </Button>
           {googleEnabled && (
             <>
-              <div className="my-4 text-center text-xs uppercase text-slate-400">or</div>
+              <div className="my-4 text-center text-xs uppercase text-slate-500">or</div>
               <a
                 href={`${API_URL}/auth/google?returnTo=${encodeURIComponent(returnTo)}`}
                 className="flex min-h-11 w-full items-center justify-center rounded border border-slate-300 font-semibold hover:bg-slate-50"

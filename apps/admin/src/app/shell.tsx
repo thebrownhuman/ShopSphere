@@ -25,6 +25,12 @@ export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   return (
     <>
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2 focus:text-slate-900"
+      >
+        Skip to main content
+      </a>
       <header className="bg-brand-navy text-white">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-4 px-4 py-3">
           <Link href="/" className="text-lg font-semibold">
@@ -59,7 +65,7 @@ export function Shell({ children }: { children: ReactNode }) {
           )}
         </div>
       </header>
-      <main className="mx-auto max-w-7xl px-4 py-6">
+      <main id="main" tabIndex={-1} className="mx-auto max-w-7xl px-4 py-6 outline-none">
         {me === undefined && pathname !== '/signin' ? (
           <p className="text-slate-600">Loading…</p>
         ) : me || pathname === '/signin' ? (

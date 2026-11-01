@@ -1,3 +1,35 @@
+## M7.3 compliance + M7.4 accessibility
+
+Migration `20261103100000_privacy_compliance` (`privacy_requests`, `products.country_of_origin`).
+Contract: `packages/types/src/privacy.ts`.
+
+- DPDP export (`apps/api/src/modules/privacy`): `POST /me/export` queues a job (one per 24 h) that
+  zips JSON files (profile, addresses, orders, returns, reviews, Q&A, tickets, wishlist/cart,
+  sessions, store balance) into the private bucket (`PRIVACY_BUCKET`, default the invoices bucket)
+  and emails the shopper; `GET /me/export` mints a 15-minute signed link (archive kept 7 days).
+- Account deletion: `POST /me/delete-account` needs a step-up re-auth (10 min), refuses with open
+  orders or a Seller Central account, signs out every other device and schedules erasure after
+  `PRIVACY_DELETION_GRACE_DAYS` (14); `DELETE` cancels. When due, the sweep (in-process every 5 min,
+  `PRIVACY_WORKERS_ENABLED=false` to disable; `POST /privacy/internal/sweep` with `x-internal-token`
+  = `CATALOG_INTERNAL_TOKEN`) deletes identities, addresses, carts, wishlist, devices, push
+  subscriptions, preferences and history, scrubs tickets, anonymises review/Q&A names, reduces
+  order address snapshots to city/state/pincode (orders + invoices kept for GST) and revokes every
+  session.
+- GST e-invoicing: `apps/workers/src/invoices/einvoice.ts` `EInvoiceProvider`; `SimulatedIrpProvider`
+  derives the IRN (SHA-256 of GSTIN + FY + doc type + number), ack no/date and an HS256-signed QR
+  payload (`EINVOICE_SIGNING_SECRET`), printed on the invoice with a QR placeholder and stored as S3
+  object metadata. Skipped for shipments without a seller GSTIN.
+- Web: `/privacy`, `/terms`, `/returns-policy`, `/grievance`, `/account/privacy`; cookie banner
+  (`lib/consent.ts`, cookie `ss_consent`, essential-only default; `track()` sends nothing without
+  analytics consent; "Cookie preferences" in the footer). PDP shows seller address and country of
+  origin (the seller listing form has the field).
+- Accessibility: axe suites `apps/web/e2e/a11y.spec.ts` (runs with `playwright.checkout-api.config.ts`),
+  `apps/seller/e2e/a11y.spec.ts`, `apps/admin/e2e/a11y.spec.ts`; results and the manual pass in
+  `docs/accessibility/audit.md`.
+
+Tests: `apps/api/test/privacy.int.spec.ts`, `apps/workers/src/invoices/invoice.spec.ts`,
+`apps/web/src/components/cookie-consent.test.tsx`.
+
 ## M4/M6 gap fixes
 
 Migration `20261102100000_gap_fixes` (order_items.hsn_code, shipments.invoice_key/number,
