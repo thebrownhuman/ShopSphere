@@ -194,7 +194,11 @@ function AddressForm({
   };
 
   return (
-    <form onSubmit={submit} className="max-w-xl rounded-lg border border-slate-200 bg-white p-6">
+    <form
+      onSubmit={submit}
+      aria-label="Address"
+      className="max-w-xl rounded-lg border border-slate-200 bg-white p-6"
+    >
       <h2 className="mb-4 text-lg font-semibold">
         {'id' in initial ? 'Edit address' : 'Add a new address'}
       </h2>

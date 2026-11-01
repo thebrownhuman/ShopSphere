@@ -46,13 +46,15 @@ test('sign-up with email OTP, add address, sign out, sign back in with password'
 
   // Address with pincode autofill.
   await page.getByRole('button', { name: 'Add address' }).click();
-  await page.getByLabel('Full name').fill('Asha Verma');
-  await page.getByLabel('Mobile number').fill('9876543210');
-  await page.getByLabel('Pincode').fill('560001');
-  await expect(page.getByLabel('City')).toHaveValue('Bengaluru');
-  await expect(page.getByLabel('State')).toHaveValue('Karnataka');
-  await page.getByLabel('Flat, house no., building, street').fill('12 MG Road');
-  await page.getByRole('button', { name: 'Save address' }).click();
+  // Scoped to the form: the header's deliver-to widgets also have "Pincode" fields.
+  const form = page.getByRole('form', { name: 'Address' });
+  await form.getByLabel('Full name').fill('Asha Verma');
+  await form.getByLabel('Mobile number').fill('9876543210');
+  await form.getByLabel('Pincode').fill('560001');
+  await expect(form.getByLabel('City')).toHaveValue('Bengaluru');
+  await expect(form.getByLabel('State')).toHaveValue('Karnataka');
+  await form.getByLabel('Flat, house no., building, street').fill('12 MG Road');
+  await form.getByRole('button', { name: 'Save address' }).click();
   const card = page.getByTestId('address-card');
   await expect(card).toHaveCount(1);
   await expect(card).toContainText('Default');
