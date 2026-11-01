@@ -1,0 +1,20 @@
+# M7.7 Prometheus. Scrapes the API on the host: 4000 (dev), 4210 (E2E stack), 4310 (load test).
+# Ports that are not running just show up=0; no alert keys on `up`.
+global:
+  scrape_interval: 10s
+  evaluation_interval: 15s
+
+rule_files: [/etc/prometheus/alerts.yml]
+
+alerting:
+  alertmanagers:
+    - static_configs: [{ targets: ['alertmanager:9093'] }]
+
+scrape_configs:
+  - job_name: shopsphere-api
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          ['host.docker.internal:4000', 'host.docker.internal:4210', 'host.docker.internal:4310']
+  - job_name: prometheus
+    static_configs: [{ targets: ['localhost:9090'] }]

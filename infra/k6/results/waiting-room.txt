@@ -1,0 +1,71 @@
+time="2026-11-01T16:08:46Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T16:09:20Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T16:09:24Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T16:09:25Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T16:09:26Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T16:09:29Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T16:11:34Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T16:11:34Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T16:11:35Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T16:11:35Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T16:11:36Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T16:11:43Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T16:11:43Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T16:11:44Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T16:11:44Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+time="2026-11-01T16:11:46Z" level=warning msg="Request Failed" error="Post \"http://host.docker.internal:4115/checkout/pay\": dial: i/o timeout"
+
+
+  █ THRESHOLDS 
+
+    http_req_duration{step:checkout}
+    ✓ 'p(99)<1000' p(99)=363.77ms
+
+    http_req_failed
+    ✓ 'rate<0.01' rate=0.10%
+
+    journeys_failed
+    ✓ 'count<10' count=0
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 7294    28.076909/s
+    checks_succeeded...: 100.00% 7294 out of 7294
+    checks_failed......: 0.00%   0 out of 7294
+
+    ✓ home
+    ✓ search
+    ✓ pdp
+    ✓ add to cart
+    ✓ pay online
+    ✓ place order
+    ✓ initiate
+    ✓ verify
+
+    CUSTOM
+    checkout_to_confirmed..........: avg=19.82s  med=20.78s  p(90)=36.31s  p(95)=36.72s   p(99)=1m5s     max=1m7s  
+    journey_duration...............: avg=25.94s  med=26.8s   p(90)=42.45s  p(95)=43.3s    p(99)=1m12s    max=1m14s 
+    journeys_failed................: 0      0/s
+    orders_confirmed...............: 882    3.395096/s
+    waiting_room_wait..............: avg=24.76s  med=29.08s  p(90)=35.35s  p(95)=35.49s   p(99)=35.76s   max=36.02s
+
+    HTTP
+    http_req_duration..............: avg=25.49ms med=11.14ms p(90)=47.75ms p(95)=71.89ms  p(99)=266.68ms max=1.38s 
+      { expected_response:true }...: avg=25.52ms med=11.15ms p(90)=47.77ms p(95)=71.93ms  p(99)=267.05ms max=1.38s 
+      { step:checkout }............: avg=34.43ms med=15.09ms p(90)=62.17ms p(95)=106.67ms p(99)=363.77ms max=1.03s 
+    http_req_failed................: 0.10%  16 out of 15950
+    http_reqs......................: 15950  61.396586/s
+
+    EXECUTION
+    iteration_duration.............: avg=27.35s  med=27.98s  p(90)=44.01s  p(95)=44.76s   p(99)=1m13s    max=1m16s 
+    iterations.....................: 876    3.372001/s
+    vus............................: 3      min=0           max=200
+    vus_max........................: 200    min=200         max=200
+
+    NETWORK
+    data_received..................: 139 MB 537 kB/s
+    data_sent......................: 7.0 MB 27 kB/s
+
+
+

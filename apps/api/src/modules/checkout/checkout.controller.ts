@@ -19,6 +19,7 @@ import type { AccessClaims } from '../identity/tokens/session.service';
 import { COOKIES } from '../identity/security/cookies.service';
 import { RateLimit } from '../shared/rate-limit/rate-limit.decorator';
 import { Idempotent, IDEMPOTENCY_HEADER } from '../shared/idempotency/idempotency.interceptor';
+import { WaitingRoomGuard } from '../waiting-room/waiting-room.module';
 import { CheckoutService } from './checkout.service';
 
 const UUID = z.string().uuid();
@@ -82,6 +83,7 @@ export class CheckoutController {
 
   @Post()
   @HttpCode(201)
+  @UseGuards(WaitingRoomGuard)
   create(@Auth() auth: AccessClaims, @Body() body: unknown): Promise<CheckoutSession> {
     return this.checkout.create(auth.sub, createSchema.parse(body));
   }

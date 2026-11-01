@@ -15,7 +15,8 @@
     "db:seed": "prisma db seed",
     "test:int": "prisma generate && jest --testPathPattern \"\\.int\\.spec\\.ts$\" --testPathIgnorePatterns \"/node_modules/\"",
     "k6:setup": "ts-node --transpile-only scripts/k6-oversell.ts setup",
-    "k6:verify": "ts-node --transpile-only scripts/k6-oversell.ts verify"
+    "k6:verify": "ts-node --transpile-only scripts/k6-oversell.ts verify",
+    "k6:journey": "ts-node --transpile-only scripts/k6-journey.ts setup"
   },
   "prisma": {
     "seed": "ts-node --transpile-only prisma/seed.ts"

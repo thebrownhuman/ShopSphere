@@ -116,3 +116,6 @@ export * from './returns';
 
 export * from './admin';
 export * from './privacy';
+// ───────── Sale-day waiting room (M7.5) ─────────
+
+export * from './waiting-room';

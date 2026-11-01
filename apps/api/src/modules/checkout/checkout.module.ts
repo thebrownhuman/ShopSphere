@@ -8,6 +8,7 @@ import { LedgerModule } from '../ledger/ledger.module';
 import { OrderModule } from '../order/order.module';
 import { PromotionsModule } from '../promotions/promotions.module';
 import { PaymentModule } from '../payment/payment.module';
+import { WaitingRoomModule } from '../waiting-room/waiting-room.module';
 import { CheckoutController } from './checkout.controller';
 import { CheckoutService } from './checkout.service';
 
@@ -22,6 +23,7 @@ import { CheckoutService } from './checkout.service';
     OrderModule,
     PaymentModule,
     PromotionsModule,
+    WaitingRoomModule,
     FraudModule,
   ],
   controllers: [CheckoutController],

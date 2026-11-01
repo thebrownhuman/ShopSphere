@@ -9,7 +9,8 @@ import { PriceBreakdown } from './price-breakdown';
 import { AddressStep, PaymentStep, ReviewStep } from './steps';
 
 const params = new URLSearchParams();
-vi.mock('next/navigation', () => ({ useSearchParams: () => params }));
+const router = { replace: vi.fn(), push: vi.fn() };
+vi.mock('next/navigation', () => ({ useSearchParams: () => params, useRouter: () => router }));
 vi.mock('@/lib/use-requester', () => ({
   useRequester: () => ({ request: vi.fn(), ready: true, needsSignIn: false }),
 }));

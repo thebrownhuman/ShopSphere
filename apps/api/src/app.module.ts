@@ -22,6 +22,7 @@ import { SellerModule } from './modules/seller/seller.module';
 import { PrivacyModule } from './modules/privacy/privacy.module';
 import { QaModule } from './modules/qa/qa.module';
 import { ReviewModule } from './modules/review/review.module';
+import { HttpMetricsMiddleware } from './modules/shared/metrics/metrics.module';
 import { SecurityHeadersMiddleware } from './modules/shared/security/security-headers';
 import { RequestIdMiddleware } from './modules/shared/request-id/request-id.middleware';
 import { SharedModule } from './modules/shared/shared.module';
@@ -59,6 +60,6 @@ import { SupportModule } from './modules/support/support.module';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(SecurityHeadersMiddleware, RequestIdMiddleware).forRoutes('*');
+    consumer.apply(SecurityHeadersMiddleware, RequestIdMiddleware, HttpMetricsMiddleware).forRoutes('*');
   }
 }
