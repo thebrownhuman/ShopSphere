@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { CookiePreferencesLink } from './cookie-consent';
 
 const COLUMNS: Array<{ title: string; links: Array<[string, string]> }> = [
   {
@@ -21,7 +22,7 @@ const COLUMNS: Array<{ title: string; links: Array<[string, string]> }> = [
     title: 'Let Us Help You',
     links: [
       ['Your Account', '/account'],
-      ['Returns Centre', '/account'],
+      ['Returns Centre', '/orders'],
       ['Help', '/help'],
     ],
   },
@@ -31,6 +32,7 @@ const COLUMNS: Array<{ title: string; links: Array<[string, string]> }> = [
       ['Privacy Notice', '/privacy'],
       ['Conditions of Use', '/terms'],
       ['Return Policy', '/returns-policy'],
+      ['Grievance Officer', '/grievance'],
     ],
   },
 ];
@@ -60,6 +62,9 @@ export function SiteFooter() {
         </div>
         <div className="border-t border-slate-600 px-6 py-6 text-center text-slate-200">
           <p>India · English · ₹ INR</p>
+          <p className="mt-2">
+            <CookiePreferencesLink className="underline hover:text-white" />
+          </p>
           <p className="mt-2">© 2026 ShopSphere (simulated marketplace)</p>
         </div>
       </div>

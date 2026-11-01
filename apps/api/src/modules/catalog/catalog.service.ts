@@ -50,6 +50,7 @@ export class CatalogService {
       ratingCount: row.ratingCount,
       boughtLastMonth: row.boughtLastMonth,
       returnDays: row.returnDays,
+      countryOfOrigin: row.countryOfOrigin,
       variantAttributes,
       skus: p.skus.map((s) => this.skuDetail(p, s)),
       selectedSkuId: selected.sku.id,

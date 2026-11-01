@@ -201,6 +201,7 @@ export class ListingService {
         brandId: brand.id,
         categoryId: req.categoryId,
         description: req.description?.trim() ?? '',
+        countryOfOrigin: req.countryOfOrigin?.trim() || 'India',
         bullets: (req.bullets ?? []).map((b) => b.trim()).filter(Boolean),
         specs: specItems.length ? [{ group: 'General', items: specItems }] : [],
         status: 'ACTIVE',

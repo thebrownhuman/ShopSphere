@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 import { CheckoutHeader, ChromeGate } from '@/components/checkout/chrome';
+import { CookieConsent } from '@/components/cookie-consent';
 import { SiteHeader } from '@/components/header/site-header';
 import { SiteFooter } from '@/components/site-footer';
 import { getCategories } from '@/lib/api/catalog';
@@ -31,6 +32,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           <ChromeGate checkout={<CheckoutHeader />}>
             <SiteHeader categories={categories} />
           </ChromeGate>
+          <CookieConsent />
           <div id="main" tabIndex={-1} className="outline-none">
             {children}
           </div>

@@ -21,6 +21,11 @@ const TILES: { title: string; body: string; href?: string }[] = [
     body: 'Email, SMS, WhatsApp and browser',
     href: '/account/notifications',
   },
+  {
+    title: 'Privacy & data',
+    body: 'Download your data or delete your account',
+    href: '/account/privacy',
+  },
   { title: 'Help & support', body: 'Help articles and your support tickets', href: '/help' },
 ];
 

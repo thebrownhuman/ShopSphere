@@ -559,6 +559,7 @@ function buildProduct(leaf: LeafDef, i: number): MockProduct {
       skus: skus.map(({ id: skuId, attributes, images }) => ({ id: skuId, attributes, images })),
       defaultSkuId: skus[0]!.id,
       returnPolicy: leaf.parent === 'grocery' ? 'Non-returnable' : '10-day replacement',
+      countryOfOrigin: 'India',
     },
   };
 }
@@ -802,6 +803,7 @@ export async function getOffers(productId: string, skuId: string): Promise<Offer
     sellerId: s.id,
     sellerName: s.name,
     sellerRating: s.rating,
+    sellerAddress: 'Bengaluru, Karnataka - 560066',
     price: i === 0 ? sku.price : sku.price + i * 100 * (1 + (hash(s.id) % 9)) * 10,
     mrp: sku.mrp,
     stockQty: i === 0 ? stock : 5 + i * 7,

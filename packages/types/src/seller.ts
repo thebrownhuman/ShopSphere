@@ -137,6 +137,8 @@ export interface ListingRequest {
   title: string;
   brand: string;
   description?: string;
+  /** Country of origin (Consumer Protection (E-Commerce) Rules 2020). Default "India". */
+  countryOfOrigin?: string;
   bullets?: string[];
   /** Non-variant attribute values, shown as specifications. */
   specs?: Record<string, string>;

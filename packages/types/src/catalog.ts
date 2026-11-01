@@ -42,6 +42,8 @@ export interface SellerSummary {
   rating: number;
   /** True for ShopSphere's own warehouses (1P). */
   isFirstParty: boolean;
+  /** Registered dispatch address, "City, State - PIN" (Consumer Protection (E-Commerce) Rules). */
+  address?: string;
 }
 
 /** Product tile used by search results, home carousels, recently viewed, also-viewed. */
@@ -140,6 +142,8 @@ export interface ProductDetailResponse {
   boughtLastMonth: number;
   /** Replacement / return window in days. */
   returnDays: number;
+  /** Consumer Protection (E-Commerce) Rules 2020. */
+  countryOfOrigin?: string;
   variantAttributes: VariantAttribute[];
   skus: SkuDetail[];
   /** SKU selected by ?sku or the default variant. */

@@ -123,6 +123,8 @@ export interface ProductDetail {
   skus: Sku[];
   defaultSkuId: string;
   returnPolicy: string;
+  /** Consumer Protection (E-Commerce) Rules 2020: shown on the PDP. */
+  countryOfOrigin: string;
   /** "Customers who viewed this also viewed" (co-view counts, v1). */
   alsoViewed: ProductSummary[];
 }
@@ -135,6 +137,8 @@ export interface Offer {
   sellerId: string;
   sellerName: string;
   sellerRating: number;
+  /** "City, State - PIN"; absent in older responses. */
+  sellerAddress?: string;
   price: number;
   mrp: number;
   stockQty: number;

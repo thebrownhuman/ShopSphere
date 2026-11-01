@@ -136,6 +136,18 @@ export function BuyBox() {
               {offer.sellerName}{' '}
               <span className="text-slate-600">({offer.sellerRating.toFixed(1)}★)</span>
             </dd>
+            {offer.sellerAddress && (
+              <>
+                <dt>Seller address</dt>
+                <dd className="text-slate-900" data-testid="seller-address">
+                  {offer.sellerAddress}
+                </dd>
+              </>
+            )}
+            <dt>Country of origin</dt>
+            <dd className="text-slate-900" data-testid="country-of-origin">
+              {product.countryOfOrigin}
+            </dd>
             <dt>Returns</dt>
             <dd className="text-slate-900">{product.returnPolicy}</dd>
             <dt>Payment</dt>

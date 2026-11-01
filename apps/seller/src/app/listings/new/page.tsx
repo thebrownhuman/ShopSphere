@@ -41,6 +41,7 @@ export default function NewListingPage() {
   const [brand, setBrand] = useState('');
   const [description, setDescription] = useState('');
   const [bullets, setBullets] = useState('');
+  const [countryOfOrigin, setCountryOfOrigin] = useState('India');
   const [specs, setSpecs] = useState<Record<string, string>>({});
   const [variantValues, setVariantValues] = useState<Record<string, string>>({});
   const [rows, setRows] = useState<Record<string, Row>>({});
@@ -128,6 +129,7 @@ export default function NewListingPage() {
         title,
         brand,
         description,
+        countryOfOrigin,
         bullets: bullets
           .split('\n')
           .map((b) => b.trim())
@@ -217,6 +219,13 @@ export default function NewListingPage() {
                   onChange={(e) => setDescription(e.target.value)}
                 />
               </div>
+              <Field
+                label="Country of origin"
+                name="countryOfOrigin"
+                value={countryOfOrigin}
+                onChange={(e) => setCountryOfOrigin(e.target.value)}
+                required
+              />
               <div className="md:col-span-2">
                 <label htmlFor="bullets" className="mb-1 block text-sm font-medium">
                   Key features (one per line)

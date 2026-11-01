@@ -138,6 +138,7 @@ export class ProductLoader {
         name: o.seller.name,
         rating: o.seller.ratingX10 / 10,
         isFirstParty: o.seller.isFirstParty,
+        address: `${o.seller.city}, ${o.seller.state} - ${o.seller.pincode}`,
       },
       pricing: priceInfo(o.price, o.mrp, gstBp),
       fulfilment: o.fulfilment === 'SHOPSPHERE' ? 'SHOPSPHERE' : 'SELLER',

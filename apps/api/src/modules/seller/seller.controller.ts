@@ -93,6 +93,7 @@ const listingSchema = z.object({
   title: z.string().max(200),
   brand: z.string().max(80),
   description: z.string().max(5000).optional(),
+  countryOfOrigin: z.string().trim().min(2).max(60).optional(),
   bullets: z.array(z.string().max(300)).max(10).optional(),
   specs: z.record(z.string().max(200)).optional(),
   images: z.array(z.string().max(500)).max(10).optional(),

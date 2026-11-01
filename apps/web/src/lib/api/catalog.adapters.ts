@@ -202,6 +202,7 @@ export function toProduct(p: ProductDetailResponse, apiBase: string): ProductDet
     })),
     defaultSkuId: p.selectedSkuId,
     returnPolicy: p.returnDays > 0 ? `${p.returnDays}-day replacement` : 'Non-returnable',
+    countryOfOrigin: p.countryOfOrigin ?? 'India',
     alsoViewed: p.alsoViewed.map((c) => toSummary(c, apiBase)),
   };
 }
@@ -213,6 +214,7 @@ function toOffer(o: OfferView): Offer {
     sellerId: o.seller.id,
     sellerName: o.seller.name,
     sellerRating: o.seller.rating,
+    sellerAddress: o.seller.address,
     price: o.pricing.price,
     mrp: o.pricing.mrp,
     stockQty:
