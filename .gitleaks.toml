@@ -1,0 +1,26 @@
+# gitleaks config (M7.1 secret scanning). Default rules + an allowlist for the simulation's
+# published test credentials, which are intentionally committed (they unlock nothing real).
+title = "ShopSphere gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Simulation test keys, examples and fixtures"
+paths = [
+  '''(^|/)\.env\.example$''',
+  '''(^|/)pnpm-lock\.yaml$''',
+  '''(^|/)(test|e2e|testing)/''',
+  '''\.spec\.ts$''',
+  '''^apps/api/prisma/seed[^/]*\.ts$''',
+]
+regexes = [
+  # Cloudflare Turnstile documented always-pass test keys.
+  '''1x0000000000000000000000000000000AA''',
+  '''1x00000000000000000000AA''',
+  # ShopSphere Bank / courier simulators' fixed dev credentials.
+  '''ssb_test_[a-z_]+''',
+  '''cs_test_[a-z_]+''',
+  # Razorpay test-mode placeholders (live keys use rzp_live_ and are never allowlisted).
+  '''rzp_test_[A-Za-z0-9]+''',
+]

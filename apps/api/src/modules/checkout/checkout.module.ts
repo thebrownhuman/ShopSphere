@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { CatalogModule } from '../catalog/catalog.module';
 import { CouponModule } from '../coupon/coupon.module';
+import { FraudModule } from '../fraud/fraud.module';
 import { IdentityModule } from '../identity/identity.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { LedgerModule } from '../ledger/ledger.module';
@@ -21,6 +22,7 @@ import { CheckoutService } from './checkout.service';
     OrderModule,
     PaymentModule,
     PromotionsModule,
+    FraudModule,
   ],
   controllers: [CheckoutController],
   providers: [CheckoutService],

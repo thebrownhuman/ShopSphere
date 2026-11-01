@@ -24,6 +24,8 @@ import { InventoryService } from '../inventory/inventory.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { PAY_WINDOW_MS, OrderService, type NewOrder } from '../order/order.service';
 import { PromotionsService } from '../promotions/promotions.service';
+import { FraudService, type Assessment, type FraudContext } from '../fraud/fraud.service';
+import { CaptchaService } from '../identity/security/captcha.service';
 import type { BankOfferPick } from '../promotions/bank-offer';
 import { ProviderRegistry } from '../payment/providers/provider.registry';
 import { resolveGstBp } from '../pricing/pricing';
@@ -103,6 +105,8 @@ export class CheckoutService {
     private readonly orders: OrderService,
     @Inject(ProviderRegistry) private readonly providers: ProviderRegistry,
     private readonly promotions: PromotionsService,
+    private readonly fraud: FraudService,
+    private readonly captcha: CaptchaService,
   ) {}
 
   // ───────── Sessions ─────────
@@ -490,11 +494,17 @@ export class CheckoutService {
       }),
     ]);
     const codPayable = payablePaise + (codFee ? 0 : COD_FEE_PAISE);
+    // Fraud v1 (M7.2) can force prepaid; place-order re-scores with device/IP context.
+    const fraudBlocksCod = await this.fraud.codRefused({
+      userId: s.userId,
+      totalPaise,
+      shippingState: address?.state ?? '',
+    });
     const cod = codVerdict({
       payablePaise: codPayable,
       pincode: pin,
       pincodeServiceable: serviceable,
-      risk: riskScore({ priorOrders, ordersLastHour, totalPaise }),
+      risk: fraudBlocksCod ? 100 : riskScore({ priorOrders, ordersLastHour, totalPaise }),
     });
     const available = this.providers.available();
     const paymentOptions: PaymentOption[] = [
@@ -599,6 +609,7 @@ export class CheckoutService {
     id: string,
     idempotencyKey: string,
     expectedTotalPaise: number,
+    ctx: FraudContext & { captchaToken?: string } = { ip: null, deviceId: null },
   ): Promise<PlaceOrderResponse> {
     // Same key replayed (double click, retry after timeout): answer with the order already made.
     const prior = await this.prisma.order.findUnique({
@@ -638,6 +649,8 @@ export class CheckoutService {
       );
     }
 
+    const risk = await this.screen(userId, s0.id, q, ctx);
+
     let orderId: string;
     try {
       orderId = await this.prisma.$transaction(
@@ -653,7 +666,7 @@ export class CheckoutService {
               HttpStatus.CONFLICT,
             );
           }
-          return this.createOrder(tx, s, q, idempotencyKey);
+          return this.createOrder(tx, s, q, idempotencyKey, risk);
         },
         { timeout: 20_000, maxWait: 20_000 },
       );
@@ -675,6 +688,7 @@ export class CheckoutService {
     s: SessionRow,
     q: Quote,
     idempotencyKey: string,
+    risk: Assessment,
   ): Promise<string> {
     const t = q.view.totals;
     const method = q.view.paymentMethod;
@@ -751,11 +765,58 @@ export class CheckoutService {
     // COD and fully balance-paid orders skip the gateway and confirm now (PRD §8 step 4).
     if (paymentMethod !== 'ONLINE')
       await this.orders.confirm(tx, order, { lateCapture: false, actor: 'customer' });
+    // MANUAL_REVIEW: the order stands (payment may proceed) but sellers cannot accept it.
+    if (risk.result.manualReview)
+      await tx.order.update({ where: { id: order.id }, data: { fraudHold: true } });
+    await this.fraud.record(risk, order.id, tx);
     await tx.checkoutSession.update({
       where: { id: s.id },
       data: { status: 'PLACED', orderId: order.id },
     });
     return order.id;
+  }
+
+  /**
+   * Fraud scoring v1 (M7.2) + checkout bot protection (M7.1). High risk on COD → refuse COD
+   * (customer can switch to prepaid). Velocity-driven risk → Turnstile step-up.
+   */
+  private async screen(
+    userId: string,
+    checkoutId: string,
+    q: Quote,
+    ctx: FraudContext & { captchaToken?: string },
+  ): Promise<Assessment> {
+    const t = q.view.totals;
+    const method = q.view.paymentMethod;
+    const a = await this.fraud.assess(
+      {
+        userId,
+        checkoutId,
+        paymentMethod:
+          t.payablePaise === 0 ? 'STORE_BALANCE' : method?.type === 'COD' ? 'COD' : 'ONLINE',
+        totalPaise: t.totalPaise,
+        shippingState: q.address?.state ?? '',
+      },
+      { ip: ctx.ip, deviceId: ctx.deviceId },
+    );
+    if (a.result.forcePrepaid) {
+      await this.fraud.record(a, null);
+      throw new AppError(
+        'COD_UNAVAILABLE',
+        'Cash on Delivery is not available for this order. Please pay online.',
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        { reason: 'COD_RISK' },
+      );
+    }
+    if (a.result.challenge && !(await this.captcha.verify(ctx.captchaToken, ctx.ip ?? undefined))) {
+      await this.fraud.record(a, null);
+      throw new AppError(
+        'CAPTCHA_REQUIRED',
+        'Please complete the security check to place this order.',
+        HttpStatus.PRECONDITION_REQUIRED,
+      );
+    }
+    return a;
   }
 
   private async placedResponse(orderId: string): Promise<PlaceOrderResponse> {

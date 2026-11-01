@@ -27,7 +27,7 @@ export const STACK_ENV = {
   DATABASE_URL,
   REDIS_URL,
   S3_ENDPOINT: S3_URL,
-  SEARCH_INDEX: 'products_m4e2e',
+  SEARCH_INDEX: process.env.E2E_SEARCH_INDEX ?? 'products_m4e2e',
 };
 
 export default defineConfig({
