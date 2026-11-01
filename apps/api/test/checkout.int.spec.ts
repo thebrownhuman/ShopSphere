@@ -26,6 +26,7 @@ process.env.DATABASE_URL ??=
   'postgresql://shopsphere:shopsphere@localhost:5440/m4_test?schema=public';
 process.env.REDIS_URL ??= 'redis://localhost:6379';
 process.env.RATE_LIMIT_PER_MINUTE = '100000';
+process.env.PLACE_ORDER_RATE_LIMIT_PER_MINUTE = '100000';
 process.env.ORDER_WORKERS_ENABLED = 'false';
 process.env.CORS_ORIGINS = 'http://localhost:3000';
 

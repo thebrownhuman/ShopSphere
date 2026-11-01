@@ -1,0 +1,32 @@
+# M7.1 dependency scanning: weekly version/security PRs for npm (pnpm workspace),
+# GitHub Actions and Docker base images. Security updates are also raised as they publish.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    groups:
+      nest:
+        patterns: ['@nestjs/*']
+      next-react:
+        patterns: ['next', 'react', 'react-dom', 'eslint-config-next', '@types/react*']
+      aws-sdk:
+        patterns: ['@aws-sdk/*']
+      dev-tooling:
+        dependency-type: development
+        update-types: [minor, patch]
+    ignore:
+      # Major upgrades are planned work (zod 4, Nest 11, Prisma 6): reviewed by hand.
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directories: ['/apps/bank-sim', '/apps/courier-sim']
+    schedule:
+      interval: weekly

@@ -26,6 +26,10 @@ const schema = z
   .refine((e) => e.NODE_ENV !== 'production' || !e.JWT_SECRET.startsWith('dev-only'), {
     message: 'JWT_SECRET must be set in production',
     path: ['JWT_SECRET'],
+  })
+  .refine((e) => e.NODE_ENV !== 'production' || !e.SESSION_COOKIE_SECRET.startsWith('dev-only'), {
+    message: 'SESSION_COOKIE_SECRET must be set in production',
+    path: ['SESSION_COOKIE_SECRET'],
   });
 
 export type IdentityEnv = z.infer<typeof schema>;

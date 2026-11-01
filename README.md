@@ -1,3 +1,31 @@
+## M7.1 security hardening + M7.2 fraud scoring
+
+- **Review:** OWASP ASVS L2 walk-through with findings and status in
+  [`docs/security/asvs-checklist.md`](docs/security/asvs-checklist.md) (internal review in place of
+  the external pen-test).
+- **Headers:** API sends HSTS, `CSP default-src 'none'`, nosniff, `X-Frame-Options: DENY`, COOP/CORP,
+  Permissions-Policy and drops `X-Powered-By` (`apps/api/src/modules/shared/security`). Seller Central
+  and Admin use a per-request nonce + `'strict-dynamic'` CSP (`src/middleware.ts`, builder in
+  `@shopsphere/config/csp`); the storefront uses the nonce policy on `/checkout`, `/account`,
+  `/signin`, `/orders`, `/cart` and a no-nonce policy on ISR catalogue pages. bank-sim/courier-sim
+  send their own strict headers.
+- **Proxy / bot protection:** set `TRUST_PROXY_HOPS` behind a load balancer. Place-order is limited to
+  `PLACE_ORDER_RATE_LIMIT_PER_MINUTE` per IP and asks for a Turnstile token (`428 CAPTCHA_REQUIRED`,
+  resend with `captchaToken`) when velocity pushes the fraud score over `FRAUD_CAPTCHA_SCORE`.
+- **Fraud v1** (`apps/api/src/modules/fraud`): every place-order is scored on account/device/IP
+  velocity, shared device, missing fingerprint, high-value first order, billing/shipping state
+  mismatch and COD on a new account. High-risk COD gets `422 COD_UNAVAILABLE` (the quote hides COD
+  too); very high risk places the order with `fraud_hold`, and sellers get `409 ORDER_ON_HOLD` until a
+  SUPPORT user approves it in Admin > **Fraud review** (`/fraud`); reject cancels and refunds.
+  Decisions are audited. Thresholds: `FRAUD_*` env vars (see `apps/api/.env.example`). Migration
+  `20261103100000_fraud_scoring`.
+- **CI:** `.github/workflows/security.yml` runs `pnpm audit --prod --audit-level high`
+  (accepted advisories in `package.json` > `pnpm.auditConfig`), GitHub dependency review on PRs and
+  gitleaks (`.gitleaks.toml`); Dependabot in `.github/dependabot.yml`. Locally: `pnpm audit:prod`.
+- **Tests:** `apps/api/test/security.int.spec.ts` (headers, IDOR, internal tokens, webhook
+  signatures, RBAC, COD block, captcha step-up, review hold, approve/reject), `fraud-rules.spec.ts`,
+  `security-headers.spec.ts`, `apps/web/src/middleware.test.ts`.
+
 ## M4/M6 gap fixes
 
 Migration `20261102100000_gap_fixes` (order_items.hsn_code, shipments.invoice_key/number,

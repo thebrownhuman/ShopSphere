@@ -4,6 +4,9 @@ import { AdminProvider } from '@/lib/admin-context';
 import { Shell } from './shell';
 import './globals.css';
 
+/** Per-request render: the nonce-based CSP (middleware.ts) needs a fresh nonce each time. */
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: { default: 'Admin', template: '%s | ShopSphere Admin' },
   robots: { index: false },

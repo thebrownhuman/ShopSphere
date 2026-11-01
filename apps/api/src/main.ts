@@ -8,6 +8,13 @@ import { sellerUploadBodyParser } from './modules/seller/seller.controller';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
   const config = app.get(AppConfig);
+  const http = app.getHttpAdapter().getInstance() as {
+    disable(k: string): void;
+    set(k: string, v: unknown): void;
+  };
+  http.disable('x-powered-by');
+  // Behind the edge/LB, req.ip must be the client (rate limits, fraud velocity). Hop count only.
+  if (config.get('TRUST_PROXY_HOPS') > 0) http.set('trust proxy', config.get('TRUST_PROXY_HOPS'));
   app.enableCors({
     origin: config.get('CORS_ORIGINS').split(','),
     credentials: true,

@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { RequireAuth } from '@/lib/auth';
 
-export default function AccountLayout({ children }: { children: ReactNode }) {
+export function AccountShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   return (
     <RequireAuth returnTo={pathname}>
