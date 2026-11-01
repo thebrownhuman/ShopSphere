@@ -1,4 +1,8 @@
-import type { OrderDetail as ApiOrderDetail, OrdersPage as ApiOrdersPage } from '@shopsphere/types';
+import type {
+  OrderDetail as ApiOrderDetail,
+  OrderInvoiceLink,
+  OrdersPage as ApiOrdersPage,
+} from '@shopsphere/types';
 import { ApiRequestError } from '../api';
 import { toOrderDetail, toOrderSummary } from './checkout.adapters';
 import { CHECKOUT_MOCK, type Requester } from './checkout';
@@ -9,6 +13,7 @@ import type { OrderDetail, OrdersPage, OrdersQuery } from './orders.types';
  *   GET  /orders?year=&status=a,b&cursor=&limit=  -> OrdersPage
  *   GET  /orders/:id                              -> OrderDetail
  *   POST /orders/:id/cancel  {reason}             -> OrderDetail
+ *   GET  /orders/:id/shipments/:sid/invoice       -> OrderInvoiceLink (signed, short-lived)
  */
 
 const mock = () => import('./orders.mock');
@@ -23,12 +28,6 @@ const STATUS_FILTER: Record<NonNullable<OrdersQuery['status']>, string | null> =
 
 const PAGE_SIZE = 50;
 
-/** The API does not list order years; offer this year and the two before. */
-const recentYears = () => {
-  const y = new Date().getUTCFullYear();
-  return [y, y - 1, y - 2];
-};
-
 export function ordersApi(request: Requester) {
   return {
     async list(q: OrdersQuery = {}): Promise<OrdersPage> {
@@ -40,7 +39,7 @@ export function ordersApi(request: Requester) {
       const page = await request<ApiOrdersPage>(`/orders?${params}`);
       return {
         orders: page.items.map(toOrderSummary),
-        years: recentYears(),
+        years: page.years ?? [],
         total: page.items.length,
         page: 1,
         pageSize: PAGE_SIZE,
@@ -51,6 +50,20 @@ export function ordersApi(request: Requester) {
       if (CHECKOUT_MOCK) return (await mock()).getOrder(id);
       try {
         return toOrderDetail(await request<ApiOrderDetail>(`/orders/${enc(id)}`));
+      } catch (e) {
+        if (e instanceof ApiRequestError && e.status === 404) return null;
+        throw e;
+      }
+    },
+
+    /** Fresh signed URL for a shipment's invoice; null when it is not generated yet. */
+    async invoiceUrl(orderId: string, shipmentId: string): Promise<string | null> {
+      if (CHECKOUT_MOCK) return '/mock-invoice.pdf';
+      try {
+        const link = await request<OrderInvoiceLink>(
+          `/orders/${enc(orderId)}/shipments/${enc(shipmentId)}/invoice`,
+        );
+        return link.url;
       } catch (e) {
         if (e instanceof ApiRequestError && e.status === 404) return null;
         throw e;

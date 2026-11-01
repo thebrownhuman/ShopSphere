@@ -252,6 +252,42 @@ export class PromotionsService {
     await tx.dealClaim.create({ data: { orderId, dealId, qty } });
   }
 
+  /**
+   * Gives an order's claimed deal units back (cancelled, payment window expired, no stock).
+   * Idempotent: only claims not yet released are returned, each exactly once.
+   */
+  async releaseClaims(tx: Tx, orderId: string): Promise<number> {
+    const rows = await tx.$queryRaw<{ deal_id: string; qty: number }[]>`
+      UPDATE deal_claims SET released_at = now()
+      WHERE order_id = ${orderId}::uuid AND released_at IS NULL
+      RETURNING deal_id::text, qty`;
+    for (const r of rows.sort((a, b) => a.deal_id.localeCompare(b.deal_id))) {
+      await tx.$executeRaw`
+        UPDATE lightning_deals SET claimed_qty = GREATEST(claimed_qty - ${r.qty}, 0), updated_at = now()
+        WHERE id = ${r.deal_id}::uuid`;
+    }
+    return rows.length;
+  }
+
+  /**
+   * Late capture (M4.34) of an order whose claims were released at expiry: the shopper paid the
+   * deal price, so take the units again while the cap allows (the deal window is not re-checked).
+   */
+  async reclaimReleased(tx: Tx, orderId: string): Promise<void> {
+    const rows = await tx.dealClaim.findMany({ where: { orderId, releasedAt: { not: null } } });
+    for (const r of rows.sort((a, b) => a.dealId.localeCompare(b.dealId))) {
+      const updated = await tx.$executeRaw`
+        UPDATE lightning_deals SET claimed_qty = claimed_qty + ${r.qty}, updated_at = now()
+        WHERE id = ${r.dealId}::uuid AND claimed_qty + ${r.qty} <= quantity_cap`;
+      if (updated === 1) {
+        await tx.dealClaim.update({
+          where: { orderId_dealId: { orderId, dealId: r.dealId } },
+          data: { releasedAt: null },
+        });
+      }
+    }
+  }
+
   // ── Bank offers ──
 
   async listBankOffers(): Promise<BankOfferView[]> {

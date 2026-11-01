@@ -4,6 +4,7 @@ import type {
   CheckoutAddress,
   DeliveryOptionType,
   OrderDetail,
+  OrderInvoiceLink,
   OrderPaymentMethod,
   OrderPaymentState,
   OrderRefund,
@@ -19,9 +20,12 @@ import { CouponService } from '../coupon/coupon.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { PaymentService } from '../payment/payment.service';
+import { PromotionsService } from '../promotions/promotions.service';
 import { AppError } from '../shared/errors/app-error';
 import { PrismaService, type Tx } from '../shared/prisma/prisma.service';
+import { INVOICE_URL_TTL_S, InvoiceStore } from './invoice.store';
 import { CANCELLABLE, canTransition, eventTypeFor } from './order-state';
+import { sellerTaxProfiles } from './seller-tax-profile';
 
 /** Online payment window (PRD §8): 15 min, extended to 30 while a payment is pending (M4.35). */
 export const PAY_WINDOW_MS = 15 * 60 * 1000;
@@ -52,6 +56,7 @@ export interface NewOrderItem {
   cgstPaise: number;
   sgstPaise: number;
   igstPaise: number;
+  hsnCode: string | null;
 }
 
 export interface NewOrder {
@@ -77,6 +82,8 @@ export interface NewOrder {
   address: CheckoutAddress;
   source: string;
   cartId: string | null;
+  /** Zero-value replacement (M6.1): the order it replaces. */
+  replacementOfId?: string | null;
   shipments: {
     sellerId: string;
     sellerName: string;
@@ -104,6 +111,18 @@ export interface AfterCommit {
 
 const n = (v: bigint | number) => Number(v);
 const SHIPPING_EVENTS = new Set(['order.shipped', 'order.out_for_delivery', 'order.delivered']);
+/** No invoice exists (or it is void) for orders in these states. */
+const NO_INVOICE = new Set([
+  'PENDING_PAYMENT',
+  'PAYMENT_FAILED',
+  'CANCELLED',
+  'CANCELLED_NO_STOCK',
+]);
+
+/** Invoice number and object key for the n-th shipment (0-based, creation order). */
+export function invoiceRef(orderNumber: string, orderId: string, shipmentId: string, i: number) {
+  return { number: `INV-${orderNumber}-${i + 1}`, key: `${orderId}/${shipmentId}.pdf` };
+}
 
 /** "OD" + yymmdd (UTC) + 10 random digits: unguessable enough for display, unique-indexed. */
 export function newOrderNumber(now = new Date()): string {
@@ -128,6 +147,8 @@ export class OrderService {
     private readonly ledger: LedgerService,
     private readonly coupons: CouponService,
     private readonly payments: PaymentService,
+    private readonly promotions: PromotionsService,
+    private readonly invoices: InvoiceStore,
   ) {}
 
   // ───────── Core ─────────
@@ -182,6 +203,8 @@ export class OrderService {
         type: meta.type,
         note: meta.note ?? null,
         actor: meta.actor,
+        courier: typeof meta.payload?.courier === 'string' ? meta.payload.courier : null,
+        awb: typeof meta.payload?.awb === 'string' ? meta.payload.awb : null,
       },
     });
     const type = eventTypeFor(to);
@@ -238,6 +261,7 @@ export class OrderService {
         shipToState: input.address.state,
         source: input.source,
         cartId: input.cartId,
+        replacementOfId: input.replacementOfId ?? null,
         payBy,
       },
     });
@@ -298,6 +322,7 @@ export class OrderService {
     opts: { lateCapture: boolean; actor: 'customer' | 'payment' },
   ): Promise<void> {
     await this.inventory.consume(tx, o.id);
+    if (opts.lateCapture) await this.promotions.reclaimReleased(tx, o.id);
     if (opts.lateCapture) await this.coupons.reinstate(tx, o.id);
     else await this.coupons.markUsed(tx, o.id);
     const items = await tx.orderItem.findMany({ where: { orderId: o.id } });
@@ -315,7 +340,27 @@ export class OrderService {
     const shipments = await tx.shipment.findMany({
       where: { orderId: o.id },
       include: { items: true },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     });
+    // The invoice worker writes each PDF at the key recorded here (GET .../invoice signs it).
+    // Zero-value replacements ship without a tax invoice (the original order's invoice stands).
+    const refs = shipments.map((s, i) =>
+      o.replacementOfId
+        ? { number: undefined, key: undefined }
+        : invoiceRef(o.number, o.id, s.id, i),
+    );
+    for (const [i, s] of shipments.entries()) {
+      if (!refs[i].key) continue;
+      await tx.shipment.update({
+        where: { id: s.id },
+        data: { invoiceKey: refs[i].key, invoiceNumber: refs[i].number },
+      });
+    }
+    const sellers = await sellerTaxProfiles(
+      tx,
+      shipments.map((s) => s.sellerId),
+    );
+    const address = o.address as unknown as CheckoutAddress;
     await this.transition(tx, o, 'CONFIRMED', {
       type: opts.lateCapture ? 'CONFIRMED_LATE_CAPTURE' : 'CONFIRMED',
       actor: opts.actor,
@@ -324,13 +369,21 @@ export class OrderService {
         totalPaise: n(o.totalPaise),
         payablePaise: n(o.payablePaise),
         lateCapture: opts.lateCapture,
-        shipments: shipments.map((s) => ({
+        billingAddress: address,
+        shippingAddress: address,
+        replacementOfId: o.replacementOfId,
+        shipments: shipments.map((s, idx) => ({
           shipmentId: s.id,
           sellerId: s.sellerId,
           sellerName: s.sellerName,
           sellerState: s.sellerState,
           shipToState: o.shipToState,
           promisedDate: s.promisedDate,
+          sellerGstin: sellers.get(s.sellerId)?.gstin ?? null,
+          sellerAddress: sellers.get(s.sellerId)?.address ?? null,
+          deliveryFeePaise: n(s.deliveryFeePaise),
+          invoiceNumber: refs[idx].number,
+          invoiceKey: refs[idx].key,
           items: s.items.map((i) => ({
             orderItemId: i.id,
             skuId: i.skuId,
@@ -339,6 +392,7 @@ export class OrderService {
             unitPricePaise: n(i.unitPricePaise),
             lineTotalPaise: n(i.lineTotalPaise),
             discountPaise: n(i.discountPaise),
+            hsnCode: i.hsnCode,
             tax: {
               rateBp: i.gstRateBp,
               taxablePaise: n(i.taxablePaise),
@@ -399,6 +453,7 @@ export class OrderService {
       await this.confirm(tx, o, { lateCapture: true, actor: 'payment' });
       return { refund: false };
     }
+    await this.promotions.releaseClaims(tx, o.id);
     await tx.order.update({
       where: { id: o.id },
       data: { cancelReason: reason, cancelledAt: new Date() },
@@ -491,6 +546,7 @@ export class OrderService {
       await this.inventory.release(tx, o.id);
       await this.ledger.creditForOrder(tx, o.userId, o.id, o.storeBalancePaise, 'expired');
       await this.coupons.release(tx, o.id);
+      await this.promotions.releaseClaims(tx, o.id);
       await this.transition(tx, o, 'PAYMENT_FAILED', {
         type: 'PAYMENT_EXPIRED',
         actor: 'system',
@@ -523,6 +579,7 @@ export class OrderService {
         'cancelled',
       );
       await this.coupons.release(tx, o.id);
+      await this.promotions.releaseClaims(tx, o.id);
       const capture = await tx.orderPaymentCapture.findUnique({ where: { orderId: o.id } });
       const attempt = capture
         ? await tx.paymentAttempt.findUnique({ where: { id: capture.attemptId } })
@@ -617,14 +674,20 @@ export class OrderService {
     });
     const page = rows.slice(0, limit);
     const last = page[page.length - 1];
+    const years = await this.prisma.$queryRaw<{ y: number }[]>`
+      SELECT DISTINCT EXTRACT(YEAR FROM placed_at AT TIME ZONE 'UTC')::int AS y
+      FROM orders WHERE user_id = ${userId}::uuid ORDER BY y DESC`;
     return {
       items: page.map((o) => this.summary(o)),
       nextCursor: rows.length > limit && last ? encodeCursor(last.placedAt, last.id) : null,
+      years: years.map((r) => Number(r.y)),
     };
   }
 
   private summary(o: OrderRow): OrderSummary {
-    const items = o.shipments.flatMap((s) => s.items);
+    const items = o.shipments.flatMap((s) =>
+      s.items.map((i) => ({ ...i, promisedDate: s.promisedDate, deliveredAt: s.deliveredAt })),
+    );
     return {
       id: o.id,
       number: o.number,
@@ -632,10 +695,16 @@ export class OrderService {
       placedAt: o.placedAt.toISOString(),
       totalPaise: n(o.totalPaise),
       itemCount: items.reduce((s, i) => s + i.qty, 0),
-      previews: items
-        .slice(0, 3)
-        .map((i) => ({ title: i.title, imageUrl: i.imageUrl, qty: i.qty })),
+      previews: items.slice(0, 3).map((i) => ({
+        title: i.title,
+        imageUrl: i.imageUrl,
+        qty: i.qty,
+        slug: i.slug,
+        expectedDeliveryDate: i.promisedDate,
+        deliveredAt: i.deliveredAt?.toISOString() ?? null,
+      })),
       paymentMethod: o.paymentMethod as OrderPaymentMethod,
+      replacementOfId: o.replacementOfId,
     };
   }
 
@@ -694,13 +763,24 @@ export class OrderService {
 
   async detail(userId: string, orderId: string): Promise<OrderDetail> {
     const o = await this.load(userId, orderId);
-    const [{ state, refunds }, events] = await Promise.all([
+    const [{ state, refunds }, events, replacementOf, replacedBy] = await Promise.all([
       this.paymentState(o),
       this.prisma.orderEventRow.findMany({
         where: { orderId: o.id },
         orderBy: { createdAt: 'asc' },
       }),
+      o.replacementOfId
+        ? this.prisma.order.findUnique({
+            where: { id: o.replacementOfId },
+            select: { id: true, number: true },
+          })
+        : null,
+      this.prisma.order.findFirst({
+        where: { replacementOfId: o.id },
+        select: { id: true, number: true },
+      }),
     ]);
+    const invoiceable = !NO_INVOICE.has(o.status);
     return {
       ...this.summary(o),
       address: o.address as unknown as CheckoutAddress,
@@ -730,6 +810,10 @@ export class OrderService {
         deliveryFeePaise: n(s.deliveryFeePaise),
         promisedDate: s.promisedDate,
         status: s.status as ShipmentStatus,
+        courier: s.courier,
+        awb: s.awb,
+        deliveredAt: s.deliveredAt?.toISOString() ?? null,
+        invoiceAvailable: invoiceable && s.status !== 'CANCELLED' && !!s.invoiceKey,
         items: s.items.map((i) => ({
           id: i.id,
           productId: i.productId,
@@ -744,6 +828,7 @@ export class OrderService {
           mrpPaise: n(i.mrpPaise),
           lineTotalPaise: n(i.lineTotalPaise),
           discountPaise: n(i.discountPaise),
+          hsnCode: i.hsnCode,
           tax: {
             rateBp: i.gstRateBp,
             taxablePaise: n(i.taxablePaise),
@@ -769,9 +854,38 @@ export class OrderService {
         note: e.note,
         actor: e.actor,
         createdAt: e.createdAt.toISOString(),
+        courier: e.courier,
+        awb: e.awb,
       })),
-      canCancel: CANCELLABLE.includes(o.status as OrderStatus),
+      canCancel: CANCELLABLE.includes(o.status as OrderStatus) && !o.replacementOfId,
       cancelReason: o.cancelReason,
+      replacementOf: replacementOf
+        ? { orderId: replacementOf.id, number: replacementOf.number }
+        : null,
+      replacedBy: replacedBy ? { orderId: replacedBy.id, number: replacedBy.number } : null,
+    };
+  }
+
+  /** Short-lived signed link to one shipment's GST invoice (owner only). */
+  async invoice(userId: string, orderId: string, shipmentId: string): Promise<OrderInvoiceLink> {
+    const o = isUuid(orderId)
+      ? await this.prisma.order.findFirst({ where: { id: orderId, userId } })
+      : null;
+    const s =
+      o && isUuid(shipmentId)
+        ? await this.prisma.shipment.findFirst({ where: { id: shipmentId, orderId: o.id } })
+        : null;
+    if (!o || !s) throw notFound();
+    const notReady = () =>
+      new AppError('INVOICE_NOT_READY', 'The invoice is not available yet', HttpStatus.NOT_FOUND);
+    if (NO_INVOICE.has(o.status) || s.status === 'CANCELLED' || !s.invoiceKey || !s.invoiceNumber)
+      throw notReady();
+    const url = await this.invoices.signedUrl(s.invoiceKey, s.invoiceNumber, INVOICE_URL_TTL_S);
+    if (!url) throw notReady();
+    return {
+      number: s.invoiceNumber,
+      url,
+      expiresAt: new Date(Date.now() + INVOICE_URL_TTL_S * 1000).toISOString(),
     };
   }
 
@@ -780,9 +894,19 @@ export class OrderService {
       ? await this.prisma.order.findFirst({ where: { id: orderId, userId } })
       : null;
     if (!o) throw notFound();
-    const { state } = await this.paymentState(o);
+    const [{ state }, failed] = await Promise.all([
+      this.paymentState(o),
+      o.status === 'PENDING_PAYMENT' || o.status === 'PAYMENT_FAILED'
+        ? this.prisma.orderEventRow.findFirst({
+            where: { orderId: o.id, type: { in: ['PAYMENT_ATTEMPT_FAILED', 'PAYMENT_EXPIRED'] } },
+            orderBy: { createdAt: 'desc' },
+          })
+        : null,
+    ]);
     return {
       orderId: o.id,
+      orderNumber: o.number,
+      failureReason: failed ? (failed.note ?? failed.type) : null,
       status: o.status as OrderStatus,
       paymentState: state,
       payablePaise: n(o.payablePaise),

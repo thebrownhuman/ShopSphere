@@ -190,35 +190,29 @@ export function toOrderSummary(o: ApiOrderSummary): OrderSummary {
     status: mapStatus(o.status),
     total: o.totalPaise,
     itemCount: o.itemCount,
-    items: o.previews.map((p) => ({ title: p.title, image: p.imageUrl, slug: '' })),
-    deliveryDate: null,
+    items: o.previews.map((p) => ({ title: p.title, image: p.imageUrl, slug: p.slug ?? '' })),
+    // Delivered: the actual day (IST); otherwise the latest promised day.
+    deliveryDate:
+      o.previews
+        .map((p) => (p.deliveredAt ? istDay(p.deliveredAt) : (p.expectedDeliveryDate ?? null)))
+        .filter((d): d is string => !!d)
+        .sort()
+        .at(-1) ?? null,
+    replacementOfId: o.replacementOfId ?? null,
   };
 }
 
-const NO_INVOICE: OrderStatus[] = [
-  'PENDING_PAYMENT',
-  'PAYMENT_FAILED',
-  'CANCELLED',
-  'CANCELLED_NO_STOCK',
-];
+const istDay = (iso: string) =>
+  new Date(new Date(iso).getTime() + 330 * 60_000).toISOString().slice(0, 10);
 
-/**
- * Invoice link: the invoice worker writes `<orderId>/<shipmentId>.pdf` to the invoices bucket.
- * GAP: the order API has no signed invoice URL yet, so the link is built from
- * NEXT_PUBLIC_INVOICE_BASE_URL (local simulation only) and hidden when that is unset.
- */
-export function invoiceUrl(
-  orderId: string,
-  shipmentId: string,
-  status: OrderStatus,
-): string | null {
-  const base = process.env.NEXT_PUBLIC_INVOICE_BASE_URL;
-  if (!base || NO_INVOICE.includes(status)) return null;
-  return `${base.replace(/\/$/, '')}/${encodeURIComponent(orderId)}/${encodeURIComponent(shipmentId)}.pdf`;
-}
+const courierLabel = (c: string) => (c === 'courier-sim' ? 'ShopSphere Logistics' : c);
 
 const tracking = (events: ApiOrderEvent[]): TrackingEvent[] =>
-  events.map((e) => ({ status: mapStatus(e.toStatus), at: e.createdAt, note: e.note }));
+  events.map((e) => ({
+    status: mapStatus(e.toStatus),
+    at: e.createdAt,
+    note: e.awb ? `${e.courier ? `${courierLabel(e.courier)} · ` : ''}AWB ${e.awb}` : e.note,
+  }));
 
 export function toOrderDetail(o: ApiOrderDetail): OrderDetail {
   const events = tracking(o.events);
@@ -231,6 +225,8 @@ export function toOrderDetail(o: ApiOrderDetail): OrderDetail {
   return {
     ...toOrderSummary(o),
     deliveryDate: promised,
+    replacementOf: o.replacementOf ?? null,
+    replacedBy: o.replacedBy ?? null,
     paymentMethod: toMethod(o.payment.method, o.payment.provider),
     address: toAddress(o.address),
     price: toPrice(
@@ -256,10 +252,11 @@ export function toOrderDetail(o: ApiOrderDetail): OrderDetail {
           unitPrice: i.unitPricePaise,
           lineTotal: i.lineTotalPaise,
         })),
-        deliveryDate: s.promisedDate,
-        trackingId: null,
+        deliveryDate: s.deliveredAt ? istDay(s.deliveredAt) : s.promisedDate,
+        trackingId: s.awb ?? null,
+        carrier: s.courier ? courierLabel(s.courier) : null,
         tracking: events,
-        invoiceUrl: invoiceUrl(o.id, s.id, status),
+        invoiceAvailable: s.invoiceAvailable ?? false,
       };
     }),
   };

@@ -5,6 +5,7 @@
  *   GET  /orders?year=&status=&cursor=&limit=   -> OrdersPage
  *   GET  /orders/:id                            -> OrderDetail
  *   GET  /orders/:id/status                     -> OrderStatusResponse   (poll every 3 s)
+ *   GET  /orders/:id/shipments/:shipmentId/invoice -> OrderInvoiceLink   (signed URL, ~5 min)
  *   POST /orders/:id/cancel   CancelOrderRequest -> OrderDetail          (allowed until SHIPPED)
  *
  * All routes need `Authorization: Bearer <access token>`; other users' orders answer 404.
@@ -39,7 +40,9 @@ export type OrderStatus =
   | 'PAYMENT_FAILED'
   | 'RETURN_REQUESTED'
   | 'PICKED_UP'
-  | 'REFUNDED';
+  | 'REFUNDED'
+  /** Return resolved with a zero-value replacement order (M6.1 "Replace"). */
+  | 'REPLACED';
 
 export type OrderPaymentMethod = 'ONLINE' | 'COD' | 'STORE_BALANCE';
 
@@ -81,6 +84,8 @@ export interface OrderItem {
   lineTotalPaise: Paise;
   discountPaise: Paise;
   tax: LineTax;
+  /** HSN code printed on the invoice. */
+  hsnCode?: string | null;
 }
 
 /**
@@ -111,6 +116,12 @@ export interface OrderShipment {
   promisedDate: string;
   status: ShipmentStatus;
   items: OrderItem[];
+  /** Courier + AWB once a label is booked (M5.6). */
+  courier?: string | null;
+  awb?: string | null;
+  deliveredAt?: string | null;
+  /** True once the invoice can be downloaded via the invoice route. */
+  invoiceAvailable?: boolean;
 }
 
 export interface OrderEvent {
@@ -124,6 +135,9 @@ export interface OrderEvent {
   /** customer | system | payment | admin */
   actor: string;
   createdAt: string;
+  /** Shipping events (SHIPPED / OUT_FOR_DELIVERY / DELIVERED): carrier + AWB. */
+  courier?: string | null;
+  awb?: string | null;
 }
 
 export interface OrderRefund {
@@ -146,8 +160,19 @@ export interface OrderSummary {
   totalPaise: Paise;
   itemCount: number;
   /** Up to 3 items for the list row. */
-  previews: { title: string; imageUrl: string | null; qty: number }[];
+  previews: {
+    title: string;
+    imageUrl: string | null;
+    qty: number;
+    slug?: string;
+    /** Promised delivery day, YYYY-MM-DD (IST). */
+    expectedDeliveryDate?: string | null;
+    /** ISO time the line's shipment was delivered. */
+    deliveredAt?: string | null;
+  }[];
   paymentMethod: OrderPaymentMethod;
+  /** Set on a zero-value replacement order: the order it replaces. */
+  replacementOfId?: string | null;
 }
 
 export interface OrderDetail extends OrderSummary {
@@ -167,11 +192,23 @@ export interface OrderDetail extends OrderSummary {
   events: OrderEvent[];
   canCancel: boolean;
   cancelReason: string | null;
+  /** Replacement links (M6.1): original order of a replacement, and the replacement of a return. */
+  replacementOf?: { orderId: string; number: string } | null;
+  replacedBy?: { orderId: string; number: string } | null;
+}
+
+export interface OrderInvoiceLink {
+  number: string;
+  /** Short-lived pre-signed URL to the PDF. */
+  url: string;
+  expiresAt: string;
 }
 
 export interface OrdersPage {
   items: OrderSummary[];
   nextCursor: string | null;
+  /** Years (desc) in which the shopper placed orders, for the year filter. */
+  years?: number[];
 }
 
 export interface OrderStatusResponse {
@@ -181,6 +218,9 @@ export interface OrderStatusResponse {
   payablePaise: Paise;
   retryUntil: string | null;
   updatedAt: string;
+  orderNumber?: string;
+  /** Reason of the latest failed attempt while PENDING_PAYMENT / PAYMENT_FAILED. */
+  failureReason?: string | null;
 }
 
 export interface CancelOrderRequest {
@@ -192,7 +232,8 @@ export type OrderErrorCode =
   | 'ORDER_NOT_CANCELLABLE'
   | 'ORDER_TRANSITION_INVALID'
   | 'ORDER_NOT_PAYABLE'
-  | 'ORDER_ALREADY_PAID';
+  | 'ORDER_ALREADY_PAID'
+  | 'INVOICE_NOT_READY';
 
 // ───────── Outbox events (consumed by invoices, notifications, analytics) ─────────
 
@@ -243,6 +284,11 @@ export interface OrderConfirmedPayload extends OrderEventBase {
   payablePaise: Paise;
   /** True when the capture arrived after the payment window (M4.34). */
   lateCapture: boolean;
+  /** Buyer addresses (billing = shipping in this simulation). */
+  billingAddress?: CheckoutAddress;
+  shippingAddress?: CheckoutAddress;
+  /** Set on a replacement order. */
+  replacementOfId?: string | null;
   shipments: {
     shipmentId: string;
     sellerId: string;
@@ -250,6 +296,13 @@ export interface OrderConfirmedPayload extends OrderEventBase {
     sellerState: string;
     shipToState: string;
     promisedDate: string;
+    sellerGstin?: string | null;
+    /** Seller's registered / pickup address, one line. */
+    sellerAddress?: string | null;
+    deliveryFeePaise?: Paise;
+    invoiceNumber?: string;
+    /** Object key in the invoices bucket where the worker must write the PDF. */
+    invoiceKey?: string;
     items: {
       orderItemId: string;
       skuId: string;
@@ -259,6 +312,7 @@ export interface OrderConfirmedPayload extends OrderEventBase {
       lineTotalPaise: Paise;
       discountPaise: Paise;
       tax: LineTax;
+      hsnCode?: string | null;
     }[];
   }[];
 }

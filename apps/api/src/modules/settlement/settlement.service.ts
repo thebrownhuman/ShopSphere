@@ -49,8 +49,10 @@ export class SettlementService {
   async recordDelivery(tx: Tx, shipmentId: string, deliveredAt: Date): Promise<void> {
     const s = await tx.shipment.findUniqueOrThrow({
       where: { id: shipmentId },
-      include: { items: true, order: { select: { number: true } } },
+      include: { items: true, order: { select: { number: true, replacementOfId: true } } },
     });
+    // Zero-value replacements carry no sale to settle (the original order's line stands).
+    if (s.order.replacementOfId) return;
     const seller = await tx.seller.findUnique({ where: { id: s.sellerId } });
     if (!seller || seller.isFirstParty) return;
     const b = settle(

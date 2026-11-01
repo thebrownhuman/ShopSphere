@@ -14,10 +14,12 @@ export const STATUS_LABEL: Record<OrderStatus, string> = {
   RETURN_REQUESTED: 'Return requested',
   PICKED_UP: 'Picked up',
   REFUNDED: 'Refunded',
+  REPLACED: 'Replaced',
 };
 
 const FORWARD: OrderStatus[] = ['CONFIRMED', 'PACKED', 'SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED'];
 const RETURN: OrderStatus[] = ['RETURN_REQUESTED', 'PICKED_UP', 'REFUNDED'];
+const REPLACE: OrderStatus[] = ['RETURN_REQUESTED', 'PICKED_UP', 'REPLACED'];
 const BRANCH: OrderStatus[] = [
   'CANCELLED',
   'CANCELLED_NO_STOCK',
@@ -44,7 +46,12 @@ const detail = (e: TrackingEvent | undefined) =>
 export function timelineSteps(status: OrderStatus, events: TrackingEvent[]): TimelineStep[] {
   const at = new Map(events.map((e) => [e.status, e]));
   const branch = BRANCH.includes(status);
-  const path = RETURN.includes(status) ? [...FORWARD, ...RETURN] : FORWARD;
+  const path =
+    status === 'REPLACED' || at.has('REPLACED')
+      ? [...FORWARD, ...REPLACE]
+      : RETURN.includes(status)
+        ? [...FORWARD, ...RETURN]
+        : FORWARD;
   const reached = path.filter((s) => at.has(s));
   const last = reached.at(-1);
   const steps: TimelineStep[] = (branch ? reached : path).map((s) => ({
@@ -53,7 +60,7 @@ export function timelineSteps(status: OrderStatus, events: TrackingEvent[]): Tim
     detail: detail(at.get(s)),
     state: !at.has(s)
       ? 'upcoming'
-      : s === last && s === status && s !== 'DELIVERED' && s !== 'REFUNDED'
+      : s === last && s === status && s !== 'DELIVERED' && s !== 'REFUNDED' && s !== 'REPLACED'
         ? 'current'
         : 'done',
   }));

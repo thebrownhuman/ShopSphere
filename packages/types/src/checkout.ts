@@ -55,6 +55,11 @@ export type PaymentMethodChoice =
 /** Every field optional; `null` clears. Fields not sent are left unchanged. */
 export interface UpdateCheckoutRequest {
   addressId?: string;
+  /**
+   * Drops lines from this checkout only (e.g. undeliverable to the chosen pincode); the cart is
+   * untouched. Removing every line is rejected (CHECKOUT_INVALID).
+   */
+  removeLines?: { skuId: string; sellerId: string }[];
   deliveryOptions?: DeliveryChoice[];
   paymentMethod?: PaymentMethodChoice | null;
   couponCode?: string | null;

@@ -11,10 +11,10 @@ import { invoiceKey, invoiceNumber, renderInvoice } from './invoice';
  * Invoice consumer (M4.30): on `order.confirmed`, renders one GST invoice per shipment and stores
  * it in S3 (SeaweedFS locally) at `<bucket>/<orderId>/<shipmentId>.pdf`.
  *
- * Idempotent: redelivery overwrites the same objects. GAP (order module): there is no endpoint
- * to record the invoice on the shipment or to sign a download URL, so the web builds the link
- * from NEXT_PUBLIC_INVOICE_BASE_URL + the deterministic key (fine for the local simulation,
- * where the bucket is readable; production needs signed URLs from GET /orders/:id).
+ * Idempotent: redelivery overwrites the same objects. The order module records the key and
+ * number on the shipment at confirmation (payload `invoiceKey` / `invoiceNumber`) and serves the
+ * PDF through a short-lived signed URL (GET /orders/:id/shipments/:shipmentId/invoice); the
+ * bucket stays private.
  */
 export interface InvoiceJobOptions {
   bucket: string;
@@ -75,9 +75,9 @@ export async function handleInvoiceEvent(
   const issuedAt = (opts.now?.() ?? new Date()).toISOString();
   const out: GeneratedInvoice[] = [];
   for (const [i, shipment] of order.shipments.entries()) {
-    const number = invoiceNumber(order, i);
+    const number = shipment.invoiceNumber ?? invoiceNumber(order, i);
     const body = renderInvoice(order, shipment, { number, issuedAt });
-    const storageKey = invoiceKey(order.orderId, shipment.shipmentId);
+    const storageKey = shipment.invoiceKey ?? invoiceKey(order.orderId, shipment.shipmentId);
     await opts.s3.send(
       new PutObjectCommand({
         Bucket: opts.bucket,

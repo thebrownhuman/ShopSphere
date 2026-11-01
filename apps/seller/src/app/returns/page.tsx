@@ -14,12 +14,14 @@ const LABEL: Record<ReturnStatus, string> = {
   RECEIVED: 'Received: QC pending',
   QC_FAILED: 'QC failed',
   REFUNDED: 'Refunded',
+  REPLACED: 'Replaced',
 };
 const FILTERS: (ReturnStatus | '')[] = [
   '',
   'RECEIVED',
   'PICKUP_SCHEDULED',
   'REFUNDED',
+  'REPLACED',
   'QC_FAILED',
 ];
 const reasonLabel = (code: string) => RETURN_REASONS.find((r) => r.code === code)?.label ?? code;
@@ -103,8 +105,18 @@ export default function ReturnsPage() {
               </ul>
               <p className="text-slate-600">
                 Pickup {r.pickupDate} from {r.pickupFrom.city} {r.pickupFrom.pincode}
-                {r.awb && ` · AWB ${r.awb}`} · Refund {formatPaise(r.amountPaise)} (
-                {r.refundTo === 'STORE_BALANCE' ? 'store balance' : 'original method'})
+                {r.awb && ` · AWB ${r.awb}`} ·{' '}
+                {r.resolution === 'REPLACE' ? (
+                  <span data-testid="return-replace">
+                    Replacement order {r.replacementOrderNumber ?? 'pending'} (ship it from Orders;
+                    no refund)
+                  </span>
+                ) : (
+                  <>
+                    Refund {formatPaise(r.amountPaise)} (
+                    {r.refundTo === 'STORE_BALANCE' ? 'store balance' : 'original method'})
+                  </>
+                )}
               </p>
               {r.qcNote && <p className="text-slate-600">QC note: {r.qcNote}</p>}
             </div>
@@ -137,7 +149,7 @@ export default function ReturnsPage() {
                         void act(r, 'qc', { result: 'PASS', note: notes[r.id] || undefined })
                       }
                     >
-                      QC pass &amp; refund
+                      {r.resolution === 'REPLACE' ? 'QC pass' : 'QC pass & refund'}
                     </Button>
                     <Button
                       variant="ghost"

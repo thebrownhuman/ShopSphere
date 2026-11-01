@@ -58,20 +58,20 @@ model ProcessedEvent {
 
 /// Customer account. Login identifiers live in user_identities.
 model User {
-  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name            String?
-  passwordHash    String?   @map("password_hash")
-  totpSecret      String?   @map("totp_secret")
-  totpEnabled     Boolean   @default(false) @map("totp_enabled")
-  status          String    @default("active")
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String?
+  passwordHash String?   @map("password_hash")
+  totpSecret   String?   @map("totp_secret")
+  totpEnabled  Boolean   @default(false) @map("totp_enabled")
+  status       String    @default("active")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(6)
 
-  identities    UserIdentity[]
-  sessions      Session[]
-  addresses     Address[]
-  knownDevices  KnownDevice[]
+  identities   UserIdentity[]
+  sessions     Session[]
+  addresses    Address[]
+  knownDevices KnownDevice[]
 
   @@map("users")
 }
@@ -93,20 +93,20 @@ model UserIdentity {
 
 /// A login session = one refresh-token family. Revoking it kills every token in the family.
 model Session {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId      String    @map("user_id") @db.Uuid
-  persistent  Boolean   @default(false)
-  userAgent   String?   @map("user_agent")
-  ip          String?
-  deviceId    String?   @map("device_id")
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  lastUsedAt  DateTime  @default(now()) @map("last_used_at") @db.Timestamptz(6)
-  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(6)
-  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz(6)
-  revokedReason String? @map("revoked_reason")
+  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String         @map("user_id") @db.Uuid
+  persistent    Boolean        @default(false)
+  userAgent     String?        @map("user_agent")
+  ip            String?
+  deviceId      String?        @map("device_id")
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastUsedAt    DateTime       @default(now()) @map("last_used_at") @db.Timestamptz(6)
+  expiresAt     DateTime       @map("expires_at") @db.Timestamptz(6)
+  revokedAt     DateTime?      @map("revoked_at") @db.Timestamptz(6)
+  revokedReason String?        @map("revoked_reason")
   /// Last step-up re-auth (password/OTP/TOTP) for sensitive changes.
-  reauthAt    DateTime? @map("reauth_at") @db.Timestamptz(6)
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reauthAt      DateTime?      @map("reauth_at") @db.Timestamptz(6)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   refreshTokens RefreshToken[]
 
   @@index([userId], map: "idx_sessions_user_id")
@@ -115,13 +115,13 @@ model Session {
 
 /// Rotating refresh tokens. Only the SHA-256 of the token is stored.
 model RefreshToken {
-  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  sessionId  String    @map("session_id") @db.Uuid
-  tokenHash  String    @unique(map: "uq_refresh_tokens_token_hash") @map("token_hash")
-  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
-  usedAt     DateTime? @map("used_at") @db.Timestamptz(6)
-  session    Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId String    @map("session_id") @db.Uuid
+  tokenHash String    @unique(map: "uq_refresh_tokens_token_hash") @map("token_hash")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  session   Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId], map: "idx_refresh_tokens_session_id")
   @@map("refresh_tokens")
@@ -129,14 +129,14 @@ model RefreshToken {
 
 /// Audit trail of OTP challenges. Live code/attempt state is in Redis (5-min TTL).
 model OtpChallenge {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  channel     String
-  target      String
-  purpose     String
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(6)
-  verifiedAt  DateTime? @map("verified_at") @db.Timestamptz(6)
-  attempts    Int       @default(0)
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  channel    String
+  target     String
+  purpose    String
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
+  verifiedAt DateTime? @map("verified_at") @db.Timestamptz(6)
+  attempts   Int       @default(0)
 
   @@index([target, createdAt], map: "idx_otp_challenges_target")
   @@map("otp_challenges")
@@ -157,22 +157,22 @@ model KnownDevice {
 }
 
 model Address {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId      String    @map("user_id") @db.Uuid
-  name        String
-  phone       String
-  line1       String
-  line2       String?
-  landmark    String?
-  city        String
-  state       String
-  pincode     String
-  type        String    @default("home")
-  isDefault   Boolean   @default(false) @map("is_default")
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  name      String
+  phone     String
+  line1     String
+  line2     String?
+  landmark  String?
+  city      String
+  state     String
+  pincode   String
+  type      String    @default("home")
+  isDefault Boolean   @default(false) @map("is_default")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId], map: "idx_addresses_user_id")
   @@map("addresses")
@@ -400,18 +400,18 @@ model ProductImage {
 
 /// Seller stub (M2.2). ShopSphere's own warehouses are sellers with is_first_party = true.
 model Seller {
-  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name         String
-  slug         String  @unique
+  slug         String         @unique
   /// Rating x10.
-  ratingX10    Int     @default(40) @map("rating_x10")
-  isFirstParty Boolean @default(false) @map("is_first_party")
+  ratingX10    Int            @default(40) @map("rating_x10")
+  isFirstParty Boolean        @default(false) @map("is_first_party")
   pincode      String
   city         String
   state        String
   /// Dispatch cutoff hour in IST (0-23); later orders ship the next day.
-  cutoffHour   Int     @default(14) @map("cutoff_hour")
-  status       String  @default("ACTIVE")
+  cutoffHour   Int            @default(14) @map("cutoff_hour")
+  status       String         @default("ACTIVE")
   offers       Offer[]
   account      SellerAccount?
 
@@ -507,16 +507,16 @@ model SearchEvent {
 
 /// One ACTIVE cart per user (partial unique index in SQL) or per guest token.
 model Cart {
-  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId     String?   @map("user_id") @db.Uuid
+  id         String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String?     @map("user_id") @db.Uuid
   /// Random token carried in the signed guest_cart cookie.
-  guestToken String?   @unique @map("guest_token")
+  guestToken String?     @unique @map("guest_token")
   /// ACTIVE | MERGED | CHECKED_OUT
-  status     String    @default("ACTIVE")
-  version    Int       @default(0)
-  expiresAt  DateTime? @map("expires_at") @db.Timestamptz(6)
-  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  status     String      @default("ACTIVE")
+  version    Int         @default(0)
+  expiresAt  DateTime?   @map("expires_at") @db.Timestamptz(6)
+  createdAt  DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
   items      CartItem[]
   saved      SavedItem[]
 
@@ -647,6 +647,8 @@ model Order {
   placedAt            DateTime  @default(now()) @map("placed_at") @db.Timestamptz(6)
   confirmedAt         DateTime? @map("confirmed_at") @db.Timestamptz(6)
   cancelledAt         DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  /// Zero-value replacement (M6.1): the original order it replaces.
+  replacementOfId     String?   @map("replacement_of_id") @db.Uuid
   updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   shipments    Shipment[]
@@ -657,35 +659,39 @@ model Order {
   @@unique([userId, idempotencyKey], map: "uq_orders_user_idempotency")
   @@index([userId, placedAt], map: "idx_orders_user_placed")
   @@index([status, payBy], map: "idx_orders_status_pay_by")
+  @@index([replacementOfId], map: "idx_orders_replacement_of")
   @@map("orders")
 }
 
 /// One package per seller/warehouse (M4.5).
 model Shipment {
-  id                    String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orderId               String      @map("order_id") @db.Uuid
-  sellerId              String      @map("seller_id") @db.Uuid
-  sellerName            String      @map("seller_name")
-  sellerState           String      @map("seller_state")
-  fulfilledByShopSphere Boolean     @map("fulfilled_by_shopsphere")
-  deliveryOption        String      @map("delivery_option")
-  deliveryFeePaise      BigInt      @map("delivery_fee_paise")
-  promisedDate          String      @map("promised_date")
-  status                String      @default("PENDING")
-  createdAt             DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
-  weightGrams           Int?        @map("weight_grams")
+  id                    String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId               String                  @map("order_id") @db.Uuid
+  sellerId              String                  @map("seller_id") @db.Uuid
+  sellerName            String                  @map("seller_name")
+  sellerState           String                  @map("seller_state")
+  fulfilledByShopSphere Boolean                 @map("fulfilled_by_shopsphere")
+  deliveryOption        String                  @map("delivery_option")
+  deliveryFeePaise      BigInt                  @map("delivery_fee_paise")
+  promisedDate          String                  @map("promised_date")
+  status                String                  @default("PENDING")
+  createdAt             DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  weightGrams           Int?                    @map("weight_grams")
   courier               String?
   awb                   String?
-  shippingCostPaise     BigInt?     @map("shipping_cost_paise")
+  shippingCostPaise     BigInt?                 @map("shipping_cost_paise")
   /// Highest courier tracking sequence applied.
-  trackingSeq           Int         @default(0) @map("tracking_seq")
-  acceptedAt            DateTime?   @map("accepted_at") @db.Timestamptz(6)
-  packedAt              DateTime?   @map("packed_at") @db.Timestamptz(6)
-  labelAt               DateTime?   @map("label_at") @db.Timestamptz(6)
-  shippedAt             DateTime?   @map("shipped_at") @db.Timestamptz(6)
-  outForDeliveryAt      DateTime?   @map("out_for_delivery_at") @db.Timestamptz(6)
-  deliveredAt           DateTime?   @map("delivered_at") @db.Timestamptz(6)
-  order                 Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  trackingSeq           Int                     @default(0) @map("tracking_seq")
+  acceptedAt            DateTime?               @map("accepted_at") @db.Timestamptz(6)
+  packedAt              DateTime?               @map("packed_at") @db.Timestamptz(6)
+  labelAt               DateTime?               @map("label_at") @db.Timestamptz(6)
+  shippedAt             DateTime?               @map("shipped_at") @db.Timestamptz(6)
+  outForDeliveryAt      DateTime?               @map("out_for_delivery_at") @db.Timestamptz(6)
+  deliveredAt           DateTime?               @map("delivered_at") @db.Timestamptz(6)
+  /// Object key of the GST invoice PDF in the private invoices bucket (set at confirmation).
+  invoiceKey            String?                 @map("invoice_key")
+  invoiceNumber         String?                 @map("invoice_number")
+  order                 Order                   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   items                 OrderItem[]
   tracking              ShipmentTrackingEvent[]
 
@@ -718,6 +724,8 @@ model OrderItem {
   cgstPaise      BigInt   @map("cgst_paise")
   sgstPaise      BigInt   @map("sgst_paise")
   igstPaise      BigInt   @map("igst_paise")
+  /// HSN code snapshot for the invoice.
+  hsnCode        String?  @map("hsn_code")
   order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   shipment       Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
 
@@ -735,6 +743,9 @@ model OrderEventRow {
   type       String
   note       String?
   actor      String
+  /// Shipping events: carrier + AWB of the shipment that moved the order.
+  courier    String?
+  awb        String?
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
@@ -957,31 +968,31 @@ model SettlementLine {
 /// approval (first-party house accounts have no user). Bank account number is stored only as
 /// last 4 + SHA-256 (simulation, never the full number).
 model SellerAccount {
-  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId           String?   @unique @map("user_id") @db.Uuid
-  sellerId         String?   @unique @map("seller_id") @db.Uuid
-  displayName      String    @map("display_name")
-  legalName        String?   @map("legal_name")
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String?       @unique @map("user_id") @db.Uuid
+  sellerId         String?       @unique @map("seller_id") @db.Uuid
+  displayName      String        @map("display_name")
+  legalName        String?       @map("legal_name")
   /// DRAFT | SUBMITTED | APPROVED | REJECTED
-  status           String    @default("DRAFT")
-  isFirstParty     Boolean   @default(false) @map("is_first_party")
+  status           String        @default("DRAFT")
+  isFirstParty     Boolean       @default(false) @map("is_first_party")
   pan              String?
   gstin            String?
-  bankHolderName   String?   @map("bank_holder_name")
-  bankAccountLast4 String?   @map("bank_account_last4")
-  bankAccountHash  String?   @map("bank_account_hash")
-  bankIfsc         String?   @map("bank_ifsc")
-  bankNameAtBank   String?   @map("bank_name_at_bank")
-  bankVerifyRef    String?   @map("bank_verify_ref")
-  bankVerifiedAt   DateTime? @map("bank_verified_at") @db.Timestamptz(6)
+  bankHolderName   String?       @map("bank_holder_name")
+  bankAccountLast4 String?       @map("bank_account_last4")
+  bankAccountHash  String?       @map("bank_account_hash")
+  bankIfsc         String?       @map("bank_ifsc")
+  bankNameAtBank   String?       @map("bank_name_at_bank")
+  bankVerifyRef    String?       @map("bank_verify_ref")
+  bankVerifiedAt   DateTime?     @map("bank_verified_at") @db.Timestamptz(6)
   /// PickupAddress JSON.
   pickup           Json?
-  rejectionReason  String?   @map("rejection_reason")
-  submittedAt      DateTime? @map("submitted_at") @db.Timestamptz(6)
-  reviewedAt       DateTime? @map("reviewed_at") @db.Timestamptz(6)
-  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
-  seller           Seller?   @relation(fields: [sellerId], references: [id])
+  rejectionReason  String?       @map("rejection_reason")
+  submittedAt      DateTime?     @map("submitted_at") @db.Timestamptz(6)
+  reviewedAt       DateTime?     @map("reviewed_at") @db.Timestamptz(6)
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  seller           Seller?       @relation(fields: [sellerId], references: [id])
   media            SellerMedia[]
 
   @@index([status, submittedAt])
@@ -1142,29 +1153,32 @@ model Answer {
 /// One return per order (the order state machine is order level). Status: REQUESTED →
 /// PICKUP_SCHEDULED → PICKED_UP → IN_TRANSIT → RECEIVED → QC_PASSED → REFUNDED, or QC_FAILED.
 model ReturnRequest {
-  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orderId      String    @unique @map("order_id") @db.Uuid
-  userId       String    @map("user_id") @db.Uuid
-  sellerId     String    @map("seller_id") @db.Uuid
-  reason       String
-  comment      String?
+  id                 String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId            String                @unique @map("order_id") @db.Uuid
+  userId             String                @map("user_id") @db.Uuid
+  sellerId           String                @map("seller_id") @db.Uuid
+  reason             String
+  comment            String?
   /// ORIGINAL | STORE_BALANCE
-  refundTo     String    @map("refund_to")
-  status       String    @default("REQUESTED")
-  amountPaise  BigInt    @map("amount_paise")
+  refundTo           String                @map("refund_to")
+  /// REFUND | REPLACE
+  resolution         String                @default("REFUND")
+  replacementOrderId String?               @map("replacement_order_id") @db.Uuid
+  status             String                @default("REQUESTED")
+  amountPaise        BigInt                @map("amount_paise")
   /// YYYY-MM-DD (IST) chosen pickup day.
-  pickupDate   String    @map("pickup_date")
-  courier      String?
-  awb          String?
-  trackingSeq  Int       @default(0) @map("tracking_seq")
-  qcNote       String?   @map("qc_note")
-  pickedUpAt   DateTime? @map("picked_up_at") @db.Timestamptz(6)
-  receivedAt   DateTime? @map("received_at") @db.Timestamptz(6)
-  qcAt         DateTime? @map("qc_at") @db.Timestamptz(6)
-  refundedAt   DateTime? @map("refunded_at") @db.Timestamptz(6)
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  tracking     ReturnTrackingEvent[]
+  pickupDate         String                @map("pickup_date")
+  courier            String?
+  awb                String?
+  trackingSeq        Int                   @default(0) @map("tracking_seq")
+  qcNote             String?               @map("qc_note")
+  pickedUpAt         DateTime?             @map("picked_up_at") @db.Timestamptz(6)
+  receivedAt         DateTime?             @map("received_at") @db.Timestamptz(6)
+  qcAt               DateTime?             @map("qc_at") @db.Timestamptz(6)
+  refundedAt         DateTime?             @map("refunded_at") @db.Timestamptz(6)
+  createdAt          DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tracking           ReturnTrackingEvent[]
 
   @@unique([courier, awb], map: "uq_returns_courier_awb")
   @@index([userId, createdAt])
@@ -1254,10 +1268,12 @@ model LightningDeal {
 }
 
 model DealClaim {
-  orderId   String   @map("order_id") @db.Uuid
-  dealId    String   @map("deal_id") @db.Uuid
-  qty       Int
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  orderId    String    @map("order_id") @db.Uuid
+  dealId     String    @map("deal_id") @db.Uuid
+  qty        Int
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// Set when the order was cancelled / expired and the units went back to the deal.
+  releasedAt DateTime? @map("released_at") @db.Timestamptz(6)
 
   @@id([orderId, dealId])
   @@map("deal_claims")

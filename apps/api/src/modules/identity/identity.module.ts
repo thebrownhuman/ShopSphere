@@ -2,6 +2,7 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 import { AccountController } from './account/account.controller';
 import { AccountService } from './account/account.service';
+import { ContactLookupService } from './account/contact-lookup.service';
 import { PincodeController } from './account/pincode.controller';
 import { AuthController } from './auth/auth.controller';
 import { AuthService } from './auth/auth.service';
@@ -34,8 +35,9 @@ import { SessionService } from './tokens/session.service';
     LoginThrottleService,
     CaptchaService,
     AccessTokenGuard,
+    ContactLookupService,
   ],
-  exports: [SessionService, AccessTokenGuard],
+  exports: [SessionService, AccessTokenGuard, ContactLookupService],
 })
 export class IdentityModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

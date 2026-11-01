@@ -55,6 +55,11 @@ const updateSchema = z
       .optional(),
     couponCode: z.string().max(40).nullable().optional(),
     useStoreBalance: z.boolean().optional(),
+    removeLines: z
+      .array(z.object({ skuId: UUID, sellerId: UUID }))
+      .min(1)
+      .max(50)
+      .optional(),
   })
   .strict();
 

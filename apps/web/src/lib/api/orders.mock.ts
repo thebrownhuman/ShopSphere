@@ -103,7 +103,7 @@ function seedOrder(n: number, status: OrderStatus, placedDaysAgo: number): Order
         deliveryDate: date(placed + 4 * day),
         trackingId: status === 'CANCELLED' ? null : `SSX${n}00042`,
         tracking,
-        invoiceUrl: status === 'CANCELLED' ? null : '/mock-invoice.pdf',
+        invoiceAvailable: status !== 'CANCELLED',
       },
     ],
     cancellable: false,

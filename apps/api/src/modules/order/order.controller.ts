@@ -11,7 +11,12 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import type { OrderDetail, OrdersPage, OrderStatusResponse } from '@shopsphere/types';
+import type {
+  OrderDetail,
+  OrderInvoiceLink,
+  OrdersPage,
+  OrderStatusResponse,
+} from '@shopsphere/types';
 import { z } from 'zod';
 import { AccessTokenGuard, Auth } from '../identity/security/access-token.guard';
 import type { AccessClaims } from '../identity/tokens/session.service';
@@ -71,6 +76,18 @@ export class OrderController {
   @Header('Cache-Control', 'no-store')
   status(@Auth() auth: AccessClaims, @Param('id') id: string): Promise<OrderStatusResponse> {
     return this.orders.status(auth.sub, id);
+  }
+
+  /** Pre-signed link (~5 min) to a shipment's GST invoice; the bucket itself is private. */
+  @Get(':id/shipments/:shipmentId/invoice')
+  @UseGuards(AccessTokenGuard)
+  @Header('Cache-Control', 'no-store')
+  invoice(
+    @Auth() auth: AccessClaims,
+    @Param('id') id: string,
+    @Param('shipmentId') shipmentId: string,
+  ): Promise<OrderInvoiceLink> {
+    return this.orders.invoice(auth.sub, id, shipmentId);
   }
 
   @Post(':id/cancel')

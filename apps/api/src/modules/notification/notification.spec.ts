@@ -85,13 +85,27 @@ const failed: NotificationEvent = {
 };
 const shipped: NotificationEvent = {
   id: 'evt-3',
-  type: 'order.status_changed',
-  payload: { ...base, status: 'SHIPPED', fromStatus: 'PACKED' },
+  type: 'order.shipped',
+  payload: {
+    ...base,
+    status: 'SHIPPED',
+    fromStatus: 'PACKED',
+    shipmentId: 'shp-1',
+    courier: 'courier-sim',
+    awb: 'SSL123456',
+  },
 };
 const delivered: NotificationEvent = {
   id: 'evt-4',
-  type: 'order.status_changed',
-  payload: { ...base, status: 'DELIVERED', fromStatus: 'SHIPPED' },
+  type: 'order.delivered',
+  payload: {
+    ...base,
+    status: 'DELIVERED',
+    fromStatus: 'SHIPPED',
+    shipmentId: 'shp-1',
+    courier: 'courier-sim',
+    awb: 'SSL123456',
+  },
 };
 const packed: NotificationEvent = {
   id: 'evt-5',
@@ -122,7 +136,9 @@ describe('templates', () => {
     '$id: email + SMS under 160 chars',
     (e) => {
       const r = render(e);
-      expect(r.email.subject).toContain(e.type === 'order.status_changed' ? 'Redmi' : 'OD200001');
+      expect(r.email.subject).toContain(
+        e.type === 'order.shipped' || e.type === 'order.delivered' ? 'Redmi' : 'OD200001',
+      );
       expect(r.email.text).toContain(`${WEB}/orders/ord-1`);
       expect(r.email.text.startsWith('Hi Asha,')).toBe(true);
       expect(r.sms.length).toBeLessThanOrEqual(160);
@@ -146,8 +162,11 @@ describe('templates', () => {
     expect(r.sms).toContain('Retry soon');
   });
 
-  it('shipped/delivered come from status_changed; other transitions send nothing', () => {
+  it('shipped/delivered carry carrier + AWB; other transitions send nothing', () => {
     expect(render(shipped).email.subject).toBe('Shipped: Redmi Note 13 5G and 1 more');
+    expect(render(shipped).email.text).toContain('ShopSphere Logistics AWB SSL123456');
+    expect(render(shipped).sms).toContain('AWB SSL123456');
+    expect(render(delivered).email.text).toContain('AWB SSL123456');
     expect(render(delivered).email.subject).toBe('Delivered: Redmi Note 13 5G and 1 more');
     expect(renderNotification(packed, to, ctx, WEB)).toBeNull();
   });

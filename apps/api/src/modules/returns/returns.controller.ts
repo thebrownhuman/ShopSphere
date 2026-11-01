@@ -23,6 +23,7 @@ const STATUSES: [ReturnStatus, ...ReturnStatus[]] = [
   'RECEIVED',
   'QC_FAILED',
   'REFUNDED',
+  'REPLACED',
 ];
 
 const createSchema = z.object({
@@ -30,6 +31,7 @@ const createSchema = z.object({
   comment: z.string().max(500).optional(),
   refundTo: z.enum(['ORIGINAL', 'STORE_BALANCE']),
   pickupDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  resolution: z.enum(['REFUND', 'REPLACE']).optional(),
 });
 const qcSchema = z.object({
   result: z.enum(['PASS', 'FAIL']),

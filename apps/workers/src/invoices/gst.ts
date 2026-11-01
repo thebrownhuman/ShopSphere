@@ -10,6 +10,7 @@ type Shipment = OrderConfirmedPayload['shipments'][number];
 
 export interface InvoiceLine {
   description: string;
+  hsn: string | null;
   qty: number;
   /** Percent, e.g. 18. */
   rate: number;
@@ -33,6 +34,7 @@ export interface InvoiceTotals {
 export function invoiceLines(shipment: Shipment): InvoiceLine[] {
   return shipment.items.map((i) => ({
     description: i.title,
+    hsn: i.hsnCode ?? null,
     qty: i.qty,
     rate: i.tax.rateBp / 100,
     gross: i.lineTotalPaise - i.discountPaise,

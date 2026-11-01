@@ -34,6 +34,9 @@ export const RETURN_REASONS: { code: ReturnReason; label: string }[] = [
 /** ORIGINAL: back to the payment method (5–7 working days). STORE_BALANCE: instant ShopSphere Pay. */
 export type RefundTarget = 'ORIGINAL' | 'STORE_BALANCE';
 
+/** REFUND: money back. REPLACE: same SKU re-shipped as a zero-value order (eligible categories). */
+export type ReturnResolution = 'REFUND' | 'REPLACE';
+
 export type ReturnStatus =
   | 'REQUESTED'
   | 'PICKUP_SCHEDULED'
@@ -41,7 +44,9 @@ export type ReturnStatus =
   | 'IN_TRANSIT'
   | 'RECEIVED'
   | 'QC_FAILED'
-  | 'REFUNDED';
+  | 'REFUNDED'
+  /** Replace returns: item received and passed QC; the replacement order ships independently. */
+  | 'REPLACED';
 
 export interface ReturnView {
   id: string;
@@ -58,6 +63,8 @@ export interface ReturnView {
   pickedUpAt: string | null;
   receivedAt: string | null;
   refundedAt: string | null;
+  resolution?: ReturnResolution;
+  replacementOrderId?: string | null;
 }
 
 export interface ReturnInfo {
@@ -75,6 +82,8 @@ export interface ReturnInfo {
   refundTargets: RefundTarget[];
   refundPaise: Paise;
   current: ReturnView | null;
+  /** Whether "Replace" is offered (category allows it and stock is available). */
+  replaceable?: boolean;
 }
 
 export interface CreateReturnRequest {
@@ -82,10 +91,14 @@ export interface CreateReturnRequest {
   comment?: string;
   refundTo: RefundTarget;
   pickupDate: string;
+  /** Default REFUND. REPLACE ignores refundTo. */
+  resolution?: ReturnResolution;
 }
 
 export interface SellerReturn extends ReturnView {
   orderNumber: string;
+  /** Replace returns: the zero-value order shipping the replacement. */
+  replacementOrderNumber?: string | null;
   items: { title: string; variant: string | null; qty: number }[];
   pickupFrom: { city: string; pincode: string };
 }

@@ -23,6 +23,41 @@ const REASONS = [
   'Other',
 ];
 
+/** Signed invoice URLs expire in minutes, so one is fetched per click. */
+function InvoiceLink({ orderId, shipmentId }: { orderId: string; shipmentId: string }) {
+  const { request } = useRequester();
+  const api = useMemo(() => ordersApi(request), [request]);
+  const [state, setState] = useState<'idle' | 'busy' | 'missing'>('idle');
+  const open = async () => {
+    setState('busy');
+    try {
+      const url = await api.invoiceUrl(orderId, shipmentId);
+      if (!url) return setState('missing');
+      window.location.assign(url);
+      setState('idle');
+    } catch {
+      setState('missing');
+    }
+  };
+  return (
+    <p className="mt-2 text-sm">
+      <button
+        type="button"
+        onClick={open}
+        disabled={state === 'busy'}
+        className="text-brand-dark underline disabled:opacity-60"
+      >
+        Download invoice (PDF)
+      </button>
+      {state === 'missing' && (
+        <span className="ml-2 text-slate-600">
+          The invoice is being generated. Try again shortly.
+        </span>
+      )}
+    </p>
+  );
+}
+
 function CancelOrder({ order, onDone }: { order: OrderDetail; onDone: (o: OrderDetail) => void }) {
   const { request } = useRequester();
   const api = useMemo(() => ordersApi(request), [request]);
@@ -152,6 +187,22 @@ export function OrderDetailView({ id }: { id: string }) {
             · Order # {order.number} ·{' '}
             <b data-testid="order-status">{STATUS_LABEL[order.status]}</b>
           </p>
+          {order.replacementOf && (
+            <p className="text-sm text-slate-700" data-testid="replacement-of">
+              Free replacement for order{' '}
+              <Link href={`/orders/${order.replacementOf.orderId}`} className="underline">
+                # {order.replacementOf.number}
+              </Link>
+            </p>
+          )}
+          {order.replacedBy && (
+            <p className="text-sm text-slate-700">
+              Replacement order{' '}
+              <Link href={`/orders/${order.replacedBy.orderId}`} className="underline">
+                # {order.replacedBy.number}
+              </Link>
+            </p>
+          )}
         </div>
         {order.cancellable && (
           <CancelOrder
@@ -205,7 +256,8 @@ export function OrderDetailView({ id }: { id: string }) {
             </h2>
             <p className="mb-2 text-xs text-slate-600">
               Sold by {sh.sellerName}
-              {sh.trackingId && ` · Tracking ID ${sh.trackingId}`}
+              {sh.trackingId &&
+                ` · ${sh.carrier ? `${sh.carrier} ` : ''}Tracking ID (AWB) ${sh.trackingId}`}
             </p>
             <ul className="divide-y divide-slate-100">
               {sh.items.map((it) => (
@@ -218,15 +270,7 @@ export function OrderDetailView({ id }: { id: string }) {
                 </li>
               ))}
             </ul>
-            {sh.invoiceUrl && (
-              <a
-                href={sh.invoiceUrl}
-                className="mt-2 inline-block text-sm text-brand-dark underline"
-                download
-              >
-                Download invoice (PDF)
-              </a>
-            )}
+            {sh.invoiceAvailable && <InvoiceLink orderId={order.id} shipmentId={sh.id} />}
           </div>
           <Timeline
             label={`Tracking for shipment ${i + 1}`}

@@ -15,7 +15,8 @@ export type OrderStatus =
   | 'CANCELLED_NO_STOCK'
   | 'RETURN_REQUESTED'
   | 'PICKED_UP'
-  | 'REFUNDED';
+  | 'REFUNDED'
+  | 'REPLACED';
 
 export interface OrderItem {
   skuId: string;
@@ -41,10 +42,12 @@ export interface OrderShipment {
   items: OrderItem[];
   /** YYYY-MM-DD (IST) promised / actual delivery date. */
   deliveryDate: string | null;
+  /** Courier AWB once a label is booked. */
   trackingId: string | null;
+  carrier?: string | null;
   tracking: TrackingEvent[];
-  /** Signed download link to the GST invoice PDF once generated. */
-  invoiceUrl: string | null;
+  /** Invoice can be downloaded (signed URL fetched on click via ordersApi.invoiceUrl). */
+  invoiceAvailable: boolean;
 }
 
 export interface OrderSummary {
@@ -56,6 +59,8 @@ export interface OrderSummary {
   itemCount: number;
   items: Pick<OrderItem, 'title' | 'image' | 'slug'>[];
   deliveryDate: string | null;
+  /** Zero-value replacement order: the order it replaces. */
+  replacementOfId?: string | null;
 }
 
 export interface OrderDetail extends Omit<OrderSummary, 'items'> {
@@ -65,6 +70,8 @@ export interface OrderDetail extends Omit<OrderSummary, 'items'> {
   shipments: OrderShipment[];
   /** Allowed until SHIPPED (PRD §10). */
   cancellable: boolean;
+  replacementOf?: { orderId: string; number: string } | null;
+  replacedBy?: { orderId: string; number: string } | null;
 }
 
 export interface OrdersQuery {

@@ -81,7 +81,6 @@ export default defineConfig({
         NEXT_PUBLIC_CHECKOUT_MOCK: '0',
         NEXT_PUBLIC_CATALOG_MOCK: '0',
         NEXT_PUBLIC_SITE_URL: WEB_URL,
-        NEXT_PUBLIC_INVOICE_BASE_URL: `${S3_URL}/invoices`,
       },
     },
   ],

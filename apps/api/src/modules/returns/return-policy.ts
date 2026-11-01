@@ -71,6 +71,22 @@ export function pickupDates(now = new Date(), n = 3): string[] {
 }
 
 /** Courier status of a reverse pickup → return status. */
+/**
+ * Top-level categories where "Replace" (same SKU, zero-value order) is offered instead of a
+ * refund. Consumables and media are refund-only.
+ */
+export const REPLACEABLE_ROOTS = new Set([
+  'electronics',
+  'mobiles-tablets',
+  'appliances',
+  'fashion',
+]);
+
+/** Replace is offered when every item's top-level category allows it. */
+export function replaceAllowed(itemRootSlugs: (string | null)[]): boolean {
+  return itemRootSlugs.length > 0 && itemRootSlugs.every((s) => !!s && REPLACEABLE_ROOTS.has(s));
+}
+
 export const COURIER_TO_RETURN: Record<string, ReturnStatus> = {
   SHIPPED: 'PICKED_UP',
   OUT_FOR_DELIVERY: 'IN_TRANSIT',
@@ -85,6 +101,7 @@ const RANK: Record<ReturnStatus, number> = {
   RECEIVED: 4,
   QC_FAILED: 5,
   REFUNDED: 5,
+  REPLACED: 5,
 };
 
 /** Couriers retry and reorder webhooks: only forward moves apply. */

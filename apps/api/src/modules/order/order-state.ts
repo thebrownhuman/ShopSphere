@@ -11,10 +11,12 @@ export const TRANSITIONS: Record<OrderStatus, readonly OrderStatus[]> = {
   OUT_FOR_DELIVERY: ['DELIVERED'],
   DELIVERED: ['RETURN_REQUESTED'],
   RETURN_REQUESTED: ['PICKED_UP', 'DELIVERED'],
-  PICKED_UP: ['REFUNDED'],
+  // Replace returns (M6.1) end in REPLACED once the item passes QC; the replacement is its own order.
+  PICKED_UP: ['REFUNDED', 'REPLACED'],
   CANCELLED: [],
   CANCELLED_NO_STOCK: [],
   REFUNDED: [],
+  REPLACED: [],
 };
 
 export const ORDER_STATUSES = Object.keys(TRANSITIONS) as OrderStatus[];

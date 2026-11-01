@@ -17,5 +17,8 @@ export const ORDER_EVENT_TYPES: OrderEventType[] = [
   'order.payment_failed',
   'order.payment_expired',
   'order.status_changed',
+  'order.shipped',
+  'order.out_for_delivery',
+  'order.delivered',
   'order.cancelled',
 ];

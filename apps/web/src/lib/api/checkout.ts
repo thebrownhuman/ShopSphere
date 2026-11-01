@@ -1,10 +1,8 @@
 import type {
   Address,
-  CartResponse,
   CheckoutSession as ApiSession,
   CreateCheckoutRequest,
   InitiatePaymentResponse as ApiInitiate,
-  OrderDetail as ApiOrderDetail,
   OrderStatusResponse,
   PlaceOrderResponse as ApiPlaced,
   UpdateCheckoutRequest,
@@ -53,7 +51,6 @@ function realApi(request: Requester) {
     request<ApiSession>(`/checkout/${enc(id)}`, { method: 'PATCH', body });
   const create = (body: CreateCheckoutRequest) =>
     request<ApiSession>('/checkout', { method: 'POST', body });
-  const orderNumbers = new Map<string, string>();
 
   return {
     async create(source: CheckoutSource) {
@@ -69,19 +66,12 @@ function realApi(request: Requester) {
     async update(id: string, p: CheckoutPatch): Promise<CheckoutSession> {
       const current = raw.get(id);
       if (p.removeLineIds?.length) {
-        // Checkout has no line removal: drop the lines from the cart and start a fresh session.
-        if (current?.source !== 'CART')
-          throw new ApiRequestError(422, {
-            code: 'CHECKOUT_INVALID',
-            message: 'This item cannot be delivered to the selected address',
-          });
-        const cart = await request<CartResponse>('/cart');
-        const lines = cart.groups.flatMap((g) => g.lines);
-        for (const skuId of p.removeLineIds) {
-          const line = lines.find((l) => l.skuId === skuId);
-          if (line) await request(`/cart/items/${enc(line.id)}`, { method: 'DELETE' });
-        }
-        return view(await create({ source: 'CART', addressId: current.address?.id }));
+        // Session-only removal: the cart keeps the lines for another address.
+        const lines = (current?.shipments ?? []).flatMap((sh) => sh.lines);
+        const removeLines = p.removeLineIds.flatMap((skuId) =>
+          lines.filter((l) => l.skuId === skuId).map((l) => ({ skuId, sellerId: l.sellerId })),
+        );
+        return view(await patch(id, { removeLines }));
       }
       if (p.newAddress) {
         const a = await request<Address>('/me/addresses', {
@@ -142,7 +132,6 @@ function realApi(request: Requester) {
           body: { expectedTotalPaise: current.totals.totalPaise },
           headers: { 'idempotency-key': idempotencyKey },
         });
-        orderNumbers.set(res.orderId, res.orderNumber);
         return {
           status: 'PLACED',
           orderId: res.orderId,
@@ -203,16 +192,8 @@ function realApi(request: Requester) {
 
     async status(orderId: string): Promise<OrderPaymentStatus> {
       const s = await request<OrderStatusResponse>(`/orders/${enc(orderId)}/status`);
-      let number = orderNumbers.get(orderId);
-      let reason: string | null = null;
-      if (!number || s.paymentState === 'FAILED') {
-        const d = await request<ApiOrderDetail>(`/orders/${enc(orderId)}`);
-        number = d.number;
-        orderNumbers.set(orderId, number);
-        reason =
-          [...d.events].reverse().find((e) => e.type === 'PAYMENT_ATTEMPT_FAILED')?.note ?? null;
-      }
-      return toPaymentStatus(s, number, reason);
+      const reason = s.paymentState === 'FAILED' ? (s.failureReason ?? null) : null;
+      return toPaymentStatus(s, s.orderNumber ?? '', reason);
     },
   };
 }

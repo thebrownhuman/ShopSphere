@@ -393,7 +393,7 @@ export async function placeOrder(id: string, expectedTotal: number): Promise<Pla
       deliveryDate: sh.options.find((o) => o.speed === sh.selected)!.deliveryDate,
       trackingId: null,
       tracking: [{ status, at: now, note: null }],
-      invoiceUrl: null,
+      invoiceAvailable: false,
     })),
   };
   delete store.checkouts[id];

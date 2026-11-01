@@ -111,7 +111,7 @@ describe('invoice PDF', () => {
     expect(text).toContain('GSTIN: 27AAACG1234K1Z9');
     expect(text).toContain('Place of supply: Karnataka');
     expect(text).toContain('IGST');
-    expect(text).toContain('incl. coupon discount Rs. 200.00');
+    expect(text).toContain('incl. coupon / bank offer discount Rs. 200.00');
     const startxref = Number(/startxref\n(\d+)/.exec(text)![1]);
     expect(text.slice(startxref, startxref + 4)).toBe('xref');
   });
@@ -123,6 +123,65 @@ describe('invoice PDF', () => {
     }).toString('latin1');
     expect(text).toContain('CGST+SGST');
     expect(text).toContain('GSTIN: not on file');
+  });
+});
+
+describe('invoice PDF from the full order.confirmed payload', () => {
+  const address = {
+    id: 'a1',
+    name: 'Asha Rao',
+    phone: '9876543210',
+    line1: '12 MG Road',
+    line2: null,
+    landmark: null,
+    city: 'Bengaluru',
+    state: 'Karnataka',
+    pincode: '560001',
+  };
+  const full: OrderConfirmedPayload = {
+    ...order,
+    billingAddress: address,
+    shippingAddress: address,
+    shipments: [
+      {
+        ...order.shipments[0]!,
+        sellerGstin: '29AAACS1234C1Z5',
+        sellerAddress: 'Plot 4, Whitefield, Bengaluru, Karnataka - 560066',
+        deliveryFeePaise: 4_000,
+        invoiceNumber: 'INV-OD200001-1',
+        invoiceKey: 'ord-1/shp-1.pdf',
+        items: order.shipments[0]!.items.map((i) => ({ ...i, hsnCode: '8517' })),
+      },
+    ],
+  };
+
+  it('prints seller GSTIN + address, HSN, bill/ship-to and the delivery fee', () => {
+    const text = renderInvoice(full, full.shipments[0]!, {
+      number: 'INV-OD200001-1',
+      issuedAt: full.occurredAt,
+    }).toString('latin1');
+    expect(text).toContain('GSTIN: 29AAACS1234C1Z5');
+    expect(text).not.toContain('not on file');
+    expect(text).toContain('Plot 4, Whitefield');
+    expect(text).toContain('(8517)');
+    expect(text).toContain('Bill to');
+    expect(text).toContain('Ship to');
+    expect(text).toContain('Asha Rao');
+    expect(text).toContain('Delivery charges');
+    // goods 16,999 + delivery 40
+    expect(text).toContain('Rs. 17,039.00');
+  });
+
+  it('writes the PDF at the key the order module recorded', async () => {
+    const sent: PutObjectCommand[] = [];
+    const s3 = { send: async (c: unknown) => void sent.push(c as PutObjectCommand) };
+    const out = await handleInvoiceEvent({ bucket: 'invoices', s3: s3 as never }, {
+      id: 'e1',
+      type: 'order.confirmed',
+      occurredAt: full.occurredAt,
+      payload: full,
+    } as OrderEventEnvelope);
+    expect(out[0]).toMatchObject({ number: 'INV-OD200001-1', storageKey: 'ord-1/shp-1.pdf' });
   });
 });
 

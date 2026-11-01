@@ -6,8 +6,9 @@ import type { OrderEventPayloads } from '@shopsphere/types';
  *   order.confirmed                     -> "order placed"
  *   order.payment_failed                -> "payment failed, retry"
  *   order.payment_expired               -> "payment window closed"
- *   order.status_changed SHIPPED        -> "shipped"
- *   order.status_changed DELIVERED      -> "delivered"
+ *   order.shipped                       -> "shipped" (carrier + AWB)
+ *   order.out_for_delivery              -> "out for delivery" (carrier + AWB)
+ *   order.delivered                     -> "delivered"
  *   order.cancelled (incl. NO_STOCK)    -> "cancelled" / apology
  *   order.status_changed RETURN_REQUESTED / PICKED_UP / REFUNDED -> return updates (M6.1)
  * The events carry ids only, so the service resolves the recipient and item titles first.
@@ -20,6 +21,9 @@ export const NOTIFIED_TYPES = [
   'order.payment_failed',
   'order.payment_expired',
   'order.status_changed',
+  'order.shipped',
+  'order.out_for_delivery',
+  'order.delivered',
   'order.cancelled',
 ] as const;
 export type NotifiedType = (typeof NOTIFIED_TYPES)[number];
@@ -40,6 +44,9 @@ export interface OrderContext {
   itemTitles: string[];
   /** Latest promised date, YYYY-MM-DD (IST). */
   deliveryDate: string | null;
+  /** Fallback carrier + AWB when an event does not carry them. */
+  courier?: string | null;
+  awb?: string | null;
 }
 
 export interface RenderedNotification {
@@ -174,37 +181,54 @@ function render(
           `ShopSphere: Order ${p.orderNumber} was not paid in time and was released. Your cart is saved.`,
         ),
       };
-    case 'order.status_changed': {
-      if (p.status === 'SHIPPED') {
-        const by = day(ctx.deliveryDate);
-        return {
-          category: 'ORDER_UPDATES',
-          emailMandatory: false,
-          email: mail(`Shipped: ${what}`, [
-            `${what} from order ${p.orderNumber} has shipped${by ? ` and should arrive by ${by}` : ''}.`,
-            '',
-            `Track your package: ${orderUrl}`,
-          ]),
-          sms: clip(
-            `ShopSphere: ${what} has shipped${by ? `, arriving by ${by}` : ''}. Track: ${orderUrl}`,
-          ),
-        };
-      }
-      if (p.status === 'DELIVERED') {
-        return {
-          category: 'ORDER_UPDATES',
-          emailMandatory: false,
-          email: mail(`Delivered: ${what}`, [
-            `${what} from order ${p.orderNumber} has been delivered.`,
-            'Not what you expected? You can request a return from the order page.',
-            '',
-            orderUrl,
-          ]),
-          sms: clip(`ShopSphere: ${what} from order ${p.orderNumber} was delivered. ${orderUrl}`),
-        };
-      }
-      return renderReturn(e.payload, what, orderUrl, mail);
+    case 'order.shipped': {
+      const by = day(ctx.deliveryDate);
+      const track = trackingLine(e.payload.courier ?? ctx.courier, e.payload.awb ?? ctx.awb);
+      return {
+        category: 'ORDER_UPDATES',
+        emailMandatory: false,
+        email: mail(`Shipped: ${what}`, [
+          `${what} from order ${p.orderNumber} has shipped${by ? ` and should arrive by ${by}` : ''}.`,
+          ...(track ? [track] : []),
+          '',
+          `Track your package: ${orderUrl}`,
+        ]),
+        sms: clip(
+          `ShopSphere: ${what} has shipped${by ? `, arriving by ${by}` : ''}.${track ? ` ${track}.` : ''} ${orderUrl}`,
+        ),
+      };
     }
+    case 'order.out_for_delivery': {
+      const track = trackingLine(e.payload.courier ?? ctx.courier, e.payload.awb ?? ctx.awb);
+      return {
+        category: 'ORDER_UPDATES',
+        emailMandatory: false,
+        email: mail(`Out for delivery: ${what}`, [
+          `${what} from order ${p.orderNumber} is out for delivery today.`,
+          ...(track ? [track] : []),
+          '',
+          orderUrl,
+        ]),
+        sms: clip(`ShopSphere: ${what} is out for delivery today.${track ? ` ${track}.` : ''}`),
+      };
+    }
+    case 'order.delivered': {
+      const track = trackingLine(e.payload.courier ?? ctx.courier, e.payload.awb ?? ctx.awb);
+      return {
+        category: 'ORDER_UPDATES',
+        emailMandatory: false,
+        email: mail(`Delivered: ${what}`, [
+          `${what} from order ${p.orderNumber} has been delivered.`,
+          ...(track ? [track] : []),
+          'Not what you expected? You can request a return from the order page.',
+          '',
+          orderUrl,
+        ]),
+        sms: clip(`ShopSphere: ${what} from order ${p.orderNumber} was delivered. ${orderUrl}`),
+      };
+    }
+    case 'order.status_changed':
+      return renderReturn(e.payload, what, orderUrl, mail);
     case 'order.cancelled': {
       const refund = e.payload.refunds.reduce((t, r) => t + r.amountPaise, 0);
       const toBalance = e.payload.refunds.some((r) => r.destination === 'STORE_BALANCE');
@@ -236,6 +260,16 @@ function render(
     }
   }
 }
+
+function trackingLine(courier: string | null | undefined, awb: string | null | undefined) {
+  if (!awb) return null;
+  return `${courier ? `${courierName(courier)} ` : ''}AWB ${awb}`;
+}
+
+const courierName = (c: string) =>
+  c === 'courier-sim' || c === 'sim'
+    ? 'ShopSphere Logistics'
+    : c.charAt(0).toUpperCase() + c.slice(1);
 
 /** Return updates (M6.1); payload fields from ReturnsService transitions. */
 function renderReturn(

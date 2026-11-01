@@ -4,6 +4,7 @@ import {
   RETURN_REASONS,
   type RefundTarget,
   type ReturnReason,
+  type ReturnResolution,
   type ReturnStatus,
   type ReturnView,
 } from '@shopsphere/types';
@@ -25,9 +26,16 @@ export const RETURN_STATUS_LABEL: Record<ReturnStatus, string> = {
   RECEIVED: 'Received by seller, quality check pending',
   QC_FAILED: 'Quality check failed',
   REFUNDED: 'Refunded',
+  REPLACED: 'Replaced, item received and checked',
 };
 
-const RETURN_ORDER_STATUSES = ['DELIVERED', 'RETURN_REQUESTED', 'PICKED_UP', 'REFUNDED'];
+const RETURN_ORDER_STATUSES = [
+  'DELIVERED',
+  'RETURN_REQUESTED',
+  'PICKED_UP',
+  'REFUNDED',
+  'REPLACED',
+];
 
 const day = (ymd: string) =>
   new Date(`${ymd}T00:00:00+05:30`).toLocaleDateString('en-IN', {
@@ -50,7 +58,25 @@ function ReturnSummary({ r }: { r: ReturnView }) {
         {r.status === 'PICKUP_SCHEDULED' && ` · pickup on ${day(r.pickupDate)}`}
       </p>
       <p className="text-slate-700">
-        Refund {formatPaise(r.amountPaise)} to {TARGET_LABEL[r.refundTo]}
+        {r.resolution === 'REPLACE' ? (
+          <>
+            Replacement{' '}
+            {r.replacementOrderId && (
+              <Link
+                href={`/orders/${r.replacementOrderId}`}
+                className="text-brand-dark underline"
+                data-testid="replacement-order-link"
+              >
+                order
+              </Link>
+            )}{' '}
+            ships separately (no charge)
+          </>
+        ) : (
+          <>
+            Refund {formatPaise(r.amountPaise)} to {TARGET_LABEL[r.refundTo]}
+          </>
+        )}
         {r.awb && ` · Pickup AWB ${r.awb}`}
       </p>
       {r.status === 'QC_FAILED' && (
@@ -81,6 +107,7 @@ export function ReturnPanel({ orderId, orderStatus }: { orderId: string; orderSt
   const [comment, setComment] = useState('');
   const [pickupDate, setPickupDate] = useState<string | null>(null);
   const [refundTo, setRefundTo] = useState<RefundTarget | null>(null);
+  const [resolution, setResolution] = useState<ReturnResolution>('REFUND');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -95,6 +122,7 @@ export function ReturnPanel({ orderId, orderStatus }: { orderId: string; orderSt
         comment: comment || undefined,
         pickupDate: pickupDate ?? info.pickupDates[0]!,
         refundTo: refundTo ?? info.refundTargets[0]!,
+        resolution,
       });
       setOpen(false);
       await qc.invalidateQueries({ queryKey: ['order', orderId] });
@@ -173,22 +201,41 @@ export function ReturnPanel({ orderId, orderStatus }: { orderId: string; orderSt
               </label>
             ))}
           </fieldset>
-          <fieldset className="mb-4 text-sm">
-            <legend className="mb-1">Refund {formatPaise(info.refundPaise)} to</legend>
-            {info.refundTargets.map((t) => (
-              <label key={t} className="block">
-                <input
-                  type="radio"
-                  name="refundTo"
-                  className="mr-1"
-                  checked={(refundTo ?? info.refundTargets[0]) === t}
-                  onChange={() => setRefundTo(t)}
-                  data-testid={`refund-${t}`}
-                />
-                {TARGET_LABEL[t]}
-              </label>
-            ))}
-          </fieldset>
+          {info.replaceable && (
+            <fieldset className="mb-3 text-sm">
+              <legend className="mb-1">What would you like?</legend>
+              {(['REFUND', 'REPLACE'] as const).map((r) => (
+                <label key={r} className="mr-4 inline-flex items-center gap-1">
+                  <input
+                    type="radio"
+                    name="resolution"
+                    checked={resolution === r}
+                    onChange={() => setResolution(r)}
+                    data-testid={`resolution-${r}`}
+                  />
+                  {r === 'REFUND' ? 'Refund' : 'Replace with the same item (free)'}
+                </label>
+              ))}
+            </fieldset>
+          )}
+          {resolution === 'REFUND' && (
+            <fieldset className="mb-4 text-sm">
+              <legend className="mb-1">Refund {formatPaise(info.refundPaise)} to</legend>
+              {info.refundTargets.map((t) => (
+                <label key={t} className="block">
+                  <input
+                    type="radio"
+                    name="refundTo"
+                    className="mr-1"
+                    checked={(refundTo ?? info.refundTargets[0]) === t}
+                    onChange={() => setRefundTo(t)}
+                    data-testid={`refund-${t}`}
+                  />
+                  {TARGET_LABEL[t]}
+                </label>
+              ))}
+            </fieldset>
+          )}
           {error && (
             <p role="alert" className="mb-3 text-sm text-deal">
               {error}

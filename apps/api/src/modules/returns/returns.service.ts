@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type {
@@ -9,13 +10,14 @@ import type {
   RefundTarget,
   ReturnInfo,
   ReturnReason,
+  ReturnResolution,
   ReturnStatus,
   ReturnView,
   SellerReturn,
 } from '@shopsphere/types';
 import { InventoryService } from '../inventory/inventory.service';
 import { LedgerService } from '../ledger/ledger.service';
-import { isUuid, OrderService } from '../order/order.service';
+import { isUuid, OrderService, type NewOrder } from '../order/order.service';
 import { PaymentService } from '../payment/payment.service';
 import { AppError } from '../shared/errors/app-error';
 import { PrismaService, type Tx } from '../shared/prisma/prisma.service';
@@ -25,6 +27,7 @@ import {
   checkEligibility,
   COURIER_TO_RETURN,
   pickupDates,
+  replaceAllowed,
   returnTrackingApplies,
 } from './return-policy';
 
@@ -61,7 +64,14 @@ function view(r: ReturnRow): ReturnView {
     pickedUpAt: r.pickedUpAt?.toISOString() ?? null,
     receivedAt: r.receivedAt?.toISOString() ?? null,
     refundedAt: r.refundedAt?.toISOString() ?? null,
+    resolution: r.resolution as ReturnResolution,
+    replacementOrderId: r.replacementOrderId,
   };
+}
+
+/** Promised day for a replacement: four days out (IST), YYYY-MM-DD. */
+function replacementPromise(now = new Date()): string {
+  return new Date(now.getTime() + 330 * 60_000 + 4 * 86_400_000).toISOString().slice(0, 10);
 }
 
 /**
@@ -93,6 +103,7 @@ export class ReturnsService {
     const current = await this.prisma.returnRequest.findUnique({ where: { orderId } });
     const elig = await this.eligibility(this.prisma, o, now);
     const eligible = elig.eligible && !current;
+    const replaceable = eligible && (await this.replaceable(this.prisma, o.id));
     return {
       orderId,
       orderStatus: o.status as OrderStatus,
@@ -108,7 +119,113 @@ export class ReturnsService {
       refundTargets: refundTargets(o),
       refundPaise: n(o.totalPaise),
       current: current ? view(current) : null,
+      replaceable,
     };
+  }
+
+  /** Category allows Replace and every SKU is in stock at the same seller. */
+  private async replaceable(db: Tx | PrismaService, orderId: string): Promise<boolean> {
+    const items = await db.orderItem.findMany({ where: { orderId } });
+    const roots = await this.rootSlugs(
+      db,
+      items.map((i) => i.productId),
+    );
+    if (!replaceAllowed(items.map((i) => roots.get(i.productId) ?? null))) return false;
+    const offers = await db.offer.findMany({
+      where: { id: { in: items.map((i) => i.offerId) } },
+    });
+    const byId = new Map(offers.map((x) => [x.id, x]));
+    return items.every((i) => {
+      const x = byId.get(i.offerId);
+      return !!x && x.status === 'ACTIVE' && x.stockQty - x.reservedQty >= i.qty;
+    });
+  }
+
+  /**
+   * Zero-value replacement order (M6.1 "Replace"): same SKUs from the same seller, stock reserved
+   * and consumed at once, confirmed without payment, linked to the original. It then follows the
+   * normal seller → courier-sim flow. Runs inside the return-request transaction.
+   */
+  private async createReplacement(tx: Tx, o: PlainOrder, returnId: string): Promise<string> {
+    const shipments = await tx.shipment.findMany({
+      where: { orderId: o.id },
+      include: { items: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    const zero = {
+      itemsPaise: 0,
+      mrpPaise: 0,
+      deliveryPaise: 0,
+      couponDiscountPaise: 0,
+      codFeePaise: 0,
+      totalPaise: 0,
+      storeBalancePaise: 0,
+      payablePaise: 0,
+      cgstPaise: 0,
+      sgstPaise: 0,
+      igstPaise: 0,
+    };
+    const input: NewOrder = {
+      userId: o.userId,
+      checkoutId: randomUUID(),
+      idempotencyKey: `replace-${returnId}`,
+      paymentMethod: 'STORE_BALANCE',
+      paymentProvider: null,
+      totals: zero,
+      coupon: null,
+      address: o.address as unknown as CheckoutAddress,
+      source: 'REPLACEMENT',
+      cartId: null,
+      replacementOfId: o.id,
+      shipments: shipments.map((s) => ({
+        sellerId: s.sellerId,
+        sellerName: s.sellerName,
+        sellerState: s.sellerState,
+        fulfilledByShopSphere: s.fulfilledByShopSphere,
+        deliveryOption: 'STANDARD',
+        deliveryFeePaise: 0,
+        promisedDate: replacementPromise(),
+        items: s.items.map((i) => ({
+          productId: i.productId,
+          skuId: i.skuId,
+          offerId: i.offerId,
+          sellerId: i.sellerId,
+          slug: i.slug,
+          title: i.title,
+          variant: i.variant,
+          imageUrl: i.imageUrl,
+          qty: i.qty,
+          unitPricePaise: 0,
+          mrpPaise: n(i.mrpPaise),
+          lineTotalPaise: 0,
+          discountPaise: 0,
+          gstRateBp: i.gstRateBp,
+          taxablePaise: 0,
+          cgstPaise: 0,
+          sgstPaise: 0,
+          igstPaise: 0,
+          hsnCode: i.hsnCode,
+        })),
+      })),
+    };
+    const order = await this.orders.create(tx, input, null);
+    const r = await this.inventory.reserve(
+      tx,
+      order.id,
+      shipments.flatMap((s) =>
+        s.items.map((i) => ({ offerId: i.offerId, skuId: i.skuId, qty: i.qty })),
+      ),
+      new Date(Date.now() + 15 * 60_000),
+    );
+    if (!r.ok) {
+      throw new AppError(
+        'REPLACEMENT_UNAVAILABLE',
+        'This item is out of stock, so it can only be returned for a refund',
+        HttpStatus.CONFLICT,
+      );
+    }
+    await this.orders.confirm(tx, order, { lateCapture: false, actor: 'customer' });
+    return order.id;
   }
 
   async create(userId: string, orderId: string, body: CreateReturnRequest): Promise<ReturnView> {
@@ -131,7 +248,15 @@ export class ReturnsService {
       if (!elig.eligible) {
         throw new AppError('RETURN_NOT_ELIGIBLE', elig.reason, HttpStatus.CONFLICT);
       }
-      if (!refundTargets(o).includes(body.refundTo)) {
+      const replace = body.resolution === 'REPLACE';
+      if (replace && !(await this.replaceable(tx, o.id))) {
+        throw new AppError(
+          'REPLACEMENT_UNAVAILABLE',
+          'Replacement is not available for this order; choose a refund',
+          HttpStatus.CONFLICT,
+        );
+      }
+      if (!replace && !refundTargets(o).includes(body.refundTo)) {
         throw new AppError(
           'VALIDATION_FAILED',
           'Cash on Delivery orders are refunded to ShopSphere Pay balance',
@@ -149,9 +274,10 @@ export class ReturnsService {
           sellerId: shipments[0].sellerId,
           reason: body.reason,
           comment: body.comment?.trim().slice(0, 500) || null,
-          refundTo: body.refundTo,
-          amountPaise: o.totalPaise,
+          refundTo: replace ? 'STORE_BALANCE' : body.refundTo,
+          amountPaise: replace ? 0n : o.totalPaise,
           pickupDate: body.pickupDate,
+          resolution: replace ? 'REPLACE' : 'REFUND',
         },
       });
       await tx.settlementLine.updateMany({
@@ -165,11 +291,14 @@ export class ReturnsService {
         payload: {
           returnId: r.id,
           reason: body.reason,
-          refundTo: body.refundTo,
+          refundTo: r.refundTo,
           pickupDate: body.pickupDate,
+          resolution: r.resolution,
         },
       });
-      return r;
+      if (!replace) return r;
+      const replacementOrderId = await this.createReplacement(tx, o, r.id);
+      return tx.returnRequest.update({ where: { id: r.id }, data: { replacementOrderId } });
     });
     try {
       return view(await this.bookPickup(created.id));
@@ -333,6 +462,10 @@ export class ReturnsService {
         });
         return 0n;
       }
+      if (r.resolution === 'REPLACE') {
+        await this.replaced(tx, o, r, note);
+        return 0n;
+      }
       return this.refund(tx, o, r, note);
     });
     if (gateway > 0n) {
@@ -376,6 +509,25 @@ export class ReturnsService {
       payload: { returnId: r.id, refundTo: r.refundTo, refunds },
     });
     return gateway;
+  }
+
+  /** Replace return passed QC: the unit goes back to stock, no money moves, the sale stands. */
+  private async replaced(tx: Tx, o: PlainOrder, r: ReturnRow, note: string | null) {
+    await this.inventory.restock(tx, o.id);
+    await tx.returnRequest.update({
+      where: { id: r.id },
+      data: { status: 'REPLACED', qcNote: note, qcAt: new Date() },
+    });
+    await tx.settlementLine.updateMany({
+      where: { orderId: o.id, status: 'RETURN_HOLD' },
+      data: { status: 'PENDING' },
+    });
+    await this.orders.transition(tx, o, 'REPLACED', {
+      type: 'RETURN_REPLACED',
+      actor: 'seller',
+      note,
+      payload: { returnId: r.id, replacementOrderId: r.replacementOrderId },
+    });
   }
 
   private async gatewayRemaining(tx: Tx, orderId: string): Promise<bigint> {
@@ -442,9 +594,16 @@ export class ReturnsService {
       include: { shipments: { include: { items: true } } },
     });
     const address = o.address as unknown as CheckoutAddress;
+    const replacement = r.replacementOrderId
+      ? await this.prisma.order.findUnique({
+          where: { id: r.replacementOrderId },
+          select: { number: true },
+        })
+      : null;
     return {
       ...view(r),
       orderNumber: o.number,
+      replacementOrderNumber: replacement?.number ?? null,
       items: o.shipments
         .filter((s) => s.sellerId === r.sellerId)
         .flatMap((s) => s.items)

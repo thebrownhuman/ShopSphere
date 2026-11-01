@@ -30,6 +30,8 @@ import { resolveGstBp } from '../pricing/pricing';
 import { AppError } from '../shared/errors/app-error';
 import { PrismaService, type Tx } from '../shared/prisma/prisma.service';
 import { lineTax, sumTax } from '../tax/gst';
+import { resolveHsn } from '../tax/hsn';
+import { allocateDiscount } from './allocate';
 import { COD_FEE_PAISE, codVerdict, riskScore } from './cod';
 import { splitShipments, type SplitLine } from './shipments';
 
@@ -55,6 +57,7 @@ interface QuoteLine extends SplitLine {
   offer: OfferFull | null;
   view: CheckoutLine;
   categoryIds: string[];
+  hsnCode: string;
   sellerState: string;
   blocking: boolean;
   /** M6.6 lightning deal priced into this line; claimed at place-order. */
@@ -237,6 +240,22 @@ export class CheckoutService {
     };
     if (input.addressId !== undefined)
       data.addressId = (await this.requireAddress(userId, input.addressId)).id;
+    if (input.removeLines?.length) {
+      // Session-only removal (e.g. undeliverable lines): the cart keeps them.
+      const drop = new Set(input.removeLines.map((l) => `${l.skuId}:${l.sellerId}`));
+      const kept = (s.items as unknown as SessionItem[]).filter(
+        (i) => !drop.has(`${i.skuId}:${i.sellerId}`),
+      );
+      if (kept.length === 0) {
+        throw new AppError(
+          'CHECKOUT_INVALID',
+          'At least one item must stay in checkout',
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          { issues: [{ code: 'EMPTY', message: 'Nothing to check out' }] },
+        );
+      }
+      data.items = kept as unknown as Prisma.InputJsonValue;
+    }
     if (input.deliveryOptions !== undefined) {
       const merged = new Map(
         (s.deliveryChoices as unknown as DeliveryChoice[]).map((c) => [c.shipmentKey, c]),
@@ -348,6 +367,7 @@ export class CheckoutService {
         item,
         offer,
         categoryIds: chain.map((c) => c.id),
+        hsnCode: resolveHsn(chain.map((c) => c.slug)),
         sellerState: offer?.seller.state ?? '',
         blocking: issue !== null && BLOCKING.includes(issue),
         sellerId: item.sellerId,
@@ -417,6 +437,28 @@ export class CheckoutService {
       }
     }
 
+    const itemsPaise = lines.reduce((a, l) => a + l.lineTotalPaise, 0);
+    const method = (s.paymentMethod as PaymentMethodChoice | null) ?? null;
+    // Bank offer (M6.6): only when paying online through its provider (ShopSphere Bank).
+    const bankOffer = s.useStoreBalance
+      ? null
+      : await this.promotions.bankOfferFor(
+          method?.type === 'ONLINE' ? method : null,
+          itemsPaise - couponDiscount,
+          now,
+        );
+    const bankDiscount = bankOffer?.discountPaise ?? 0;
+    if (bankDiscount > 0) {
+      // Apportioned over what each line still costs after the coupon, so GST below is charged
+      // on the discounted value and line discounts add up to coupon + bank offer exactly.
+      const live = lines.filter((l) => !l.blocking);
+      const share = allocateDiscount(
+        live.map((l) => l.lineTotalPaise - l.view.discountPaise),
+        bankDiscount,
+      );
+      live.forEach((l, i) => (l.view.discountPaise += share[i]));
+    }
+
     // GST (M4.8) on what is actually paid for each line.
     const shipTo = address?.state;
     for (const l of lines) {
@@ -432,20 +474,9 @@ export class CheckoutService {
       now,
     );
 
-    const itemsPaise = lines.reduce((a, l) => a + l.lineTotalPaise, 0);
     const mrpPaise = lines.reduce((a, l) => a + l.view.mrpPaise * l.item.qty, 0);
     const deliveryPaise = shipments.reduce((a, x) => a + x.deliveryFeePaise, 0);
-    const method = (s.paymentMethod as PaymentMethodChoice | null) ?? null;
     const codFee = method?.type === 'COD' ? COD_FEE_PAISE : 0;
-    // Bank offer (M6.6): only when paying online through its provider (ShopSphere Bank).
-    const bankOffer = s.useStoreBalance
-      ? null
-      : await this.promotions.bankOfferFor(
-          method?.type === 'ONLINE' ? method : null,
-          itemsPaise - couponDiscount,
-          now,
-        );
-    const bankDiscount = bankOffer?.discountPaise ?? 0;
     const totalPaise = itemsPaise + deliveryPaise - couponDiscount - bankDiscount + codFee;
     const balance = n(await this.ledger.balance(s.userId));
     const storeBalancePaise = s.useStoreBalance ? Math.min(balance, totalPaise) : 0;
@@ -682,7 +713,7 @@ export class CheckoutService {
         deliveryOption: x.selected.type,
         deliveryFeePaise: x.deliveryFeePaise,
         promisedDate: x.deliveryDate,
-        items: x.lines.map((l) => toItem(l.view, l.view.tax)),
+        items: x.lines.map((l) => toItem(l.view, l.view.tax, l.hsnCode)),
       })),
     };
     const payBy = paymentMethod === 'ONLINE' ? new Date(Date.now() + PAY_WINDOW_MS) : null;
@@ -762,7 +793,7 @@ function choices(s: SessionRow): string {
   ]);
 }
 
-function toItem(v: CheckoutLine, tax: LineTax) {
+function toItem(v: CheckoutLine, tax: LineTax, hsnCode: string) {
   return {
     productId: v.productId,
     skuId: v.skuId,
@@ -782,5 +813,6 @@ function toItem(v: CheckoutLine, tax: LineTax) {
     cgstPaise: tax.cgstPaise,
     sgstPaise: tax.sgstPaise,
     igstPaise: tax.igstPaise,
+    hsnCode,
   };
 }
