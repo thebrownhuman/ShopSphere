@@ -1,3 +1,29 @@
+## M4/M6 gap fixes
+
+Migration `20261102100000_gap_fixes` (order_items.hsn_code, shipments.invoice_key/number,
+orders.replacement_of_id, return_requests.resolution/replacement_order_id, deal_claims.released_at,
+order_events.courier/awb). Contracts stay additive in `packages/types`.
+
+- Invoices: `order.confirmed` carries seller GSTIN + address (Seller Central KYC, else a simulated
+  GSTIN), HSN per line (`tax/hsn.ts`), billing/shipping address, delivery fee, invoice number + key.
+  `GET /orders/:id/shipments/:shipmentId/invoice` returns a ~5-minute pre-signed URL (owner only;
+  `INVOICE_NOT_READY` until the worker writes it). The `invoices` bucket is private
+  (`infra/seaweedfs/s3.json`; anonymous may read `catalog` only). `S3_PUBLIC_ENDPOINT` overrides
+  the host URLs are signed for. Recreate the s3 container after pulling: `docker compose up -d s3`.
+- Identity exports `ContactLookupService`; notifications use it. `order.shipped` /
+  `order.out_for_delivery` / `order.delivered` are notified with carrier + AWB; order detail has
+  shipment `courier`/`awb`/`deliveredAt` and event `courier`/`awb`.
+- `GET /orders`: preview `slug`, `expectedDeliveryDate`, `deliveredAt`, plus `years`.
+  `GET /orders/:id/status`: `orderNumber`, `failureReason`. `PATCH /checkout/:id {removeLines}`
+  drops lines from the session only.
+- Lightning deal claims are released on cancel / payment expiry / no-stock cancel (re-taken on a
+  late capture while the cap allows). Bank-offer discount is apportioned over lines before GST.
+- Replace returns: `POST /orders/:id/return {resolution: 'REPLACE'}` for electronics, mobiles,
+  appliances and fashion when stock exists -> zero-value replacement order (stock consumed,
+  `replacementOfId`, no invoice, no settlement) shipping through the normal seller/courier flow;
+  QC PASS restocks the returned unit and moves the original order PICKED_UP -> REPLACED.
+  E2E: second test in `apps/web/e2e/returns.spec.ts`.
+
 ## Milestone 6 reviews, review summary, Q&A
 
 Contract: `packages/types/src/review.ts` (routes and error codes in the file header). Migration
