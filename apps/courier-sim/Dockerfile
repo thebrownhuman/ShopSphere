@@ -1,5 +1,5 @@
 # Build context: repo root (see infra/docker-compose.yml).
-FROM node:22-alpine
+FROM node:26-alpine
 WORKDIR /repo
 RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
