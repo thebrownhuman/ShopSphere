@@ -14,17 +14,17 @@
   "dependencies": {
     "@shopsphere/types": "workspace:*",
     "@shopsphere/ui": "workspace:*",
-    "next": "15.5.28",
-    "react": "19.0.0",
-    "react-dom": "19.0.0"
+    "next": "15.5.29",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.10.1",
     "@playwright/test": "1.49.1",
     "@shopsphere/config": "workspace:*",
     "@types/node": "22.10.2",
-    "@types/react": "19.0.2",
-    "@types/react-dom": "19.0.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
     "autoprefixer": "10.4.20",
     "eslint": "9.17.0",
     "postcss": "8.5.32",
